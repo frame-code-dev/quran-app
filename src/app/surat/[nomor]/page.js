@@ -25,7 +25,8 @@ export default async function SuratDetail({ params }) {
   console.log(audio);
     return (
       <div className='max-w-6xl mx-auto'>
-        <h1 className='font-bold p-5 text-center'>Surat from Quran</h1>
+        <h1 className='font-bold p-5 text-center text-4xl'>NGAJI SEK </h1>
+        <hr className='mb-4'/>
         <div className='grid grid-cols-7 gap-3'>
             <ListSurat/>
             <div className='col-span-5'>
