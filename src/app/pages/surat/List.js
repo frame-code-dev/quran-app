@@ -17,13 +17,16 @@ async function getStaticProps() {
 export default async function ListSurat(){
       const data = await getStaticProps()
       return (
-            <div className='col-span-2 border p-3'>
-                {data.data.map((surat) => (
-                    <SuratList 
-                        key={surat.nomor} 
-                        surat={surat}
-                    ></SuratList>
-                ))}
+            <div className='col-span-7 border p-3'>
+                <div className='w-fit overflow-x-auto grid md:grid-cols-3'>
+                    {data.data.map((surat) => (
+                        <SuratList 
+                            key={surat.nomor} 
+                            surat={surat}
+                        ></SuratList>
+                    ))}
+
+                </div>
             </div>
           
         );

@@ -1,4 +1,5 @@
 import ListSurat from '@/app/pages/surat/List';
+import Link from 'next/link';
 import React from 'react';
 // This function gets called at build time
 // eslint-disable-next-line @next/next/no-async-client-component
@@ -26,10 +27,12 @@ export default async function SuratDetail({ params }) {
     return (
       <div className='max-w-6xl mx-auto'>
         <h1 className='font-bold p-5 text-center text-4xl'>NGAJI SEK </h1>
+        <div className='flex justify-end'>
+          <Link href='/' className='hover:underline'>Kembali Home</Link>
+        </div>
         <hr className='mb-4'/>
         <div className='grid grid-cols-7 gap-3'>
-            <ListSurat/>
-            <div className='col-span-5'>
+            <div className='col-span-7'>
               <div className='border h-full p-3'>
                   <div className='detail'>
                   <div>
@@ -39,8 +42,8 @@ export default async function SuratDetail({ params }) {
                         <p><strong>Jumlah Ayat:</strong> {surat.jumlahAyat}</p>
                         <p><strong>Tempat Turun:</strong> {surat.tempatTurun}</p>
                         <hr/>
-                        <h4>Audio Playlist</h4>
-                        <div className='grid grid-cols-3 gap-3'>
+                        <h4 className='font-bold p-3'>Audio Playlist : </h4>
+                        <div className='grid md:grid-cols-3 gap-3'>
                           {Object.keys(surat.audioFull).map((key) => (
                               <div key={key} className='mb-4 border p-3'>
                                   <p className='text-center'><strong>{reciters[key]}</strong></p>
