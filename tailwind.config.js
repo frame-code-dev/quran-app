@@ -7,10 +7,27 @@ module.exports = {
   ],
   theme: {
     extend: {
-      backgroundImage: {
-        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "gradient-conic":
-          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+      colors: {
+        quran: {
+          ivory: '#FAF9F5',
+          surface: '#FFFFFF',
+          border: '#E7E5E4',
+          borderLight: '#F2EFE9',
+          forest: '#1B4332',
+          emerald: '#2D6A4F',
+          emeraldHover: '#245640',
+          mintLight: '#F0F7F4',
+          mintBorder: '#A3CFBB',
+          brass: '#B38F5C',
+          brassLight: '#F9F6F0',
+          charcoal: '#1C1917',
+          muted: '#78716C',
+          darkBg: '#121714',
+          darkSurface: '#1A211D',
+        }
+      },
+      fontFamily: {
+        arabic: ['Amiri', '"Traditional Arabic"', 'Scheherazade', 'serif'],
       },
     },
   },

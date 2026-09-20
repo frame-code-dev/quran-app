@@ -1,81 +1,67 @@
-import ListSurat from '@/app/pages/surat/List';
-import Link from 'next/link';
-import React from 'react';
-// This function gets called at build time
-// eslint-disable-next-line @next/next/no-async-client-component
-async function getDetailSurat(nomor) {
-  // Call an external API endpoint to get data
-  const res = await fetch(`https://equran.id/api/v2/surat/${nomor}`);
-  const data = await res.json();
+import React from "react";
+import SuratDetailView from "@/components/SuratDetailView";
 
-  // By returning { props: { data } }, the Blog component
-  // will receive `data` as a prop at build time
-  return data.data;
+async function getSuratData(nomor) {
+  try {
+    const [suratRes, tafsirRes] = await Promise.all([
+      fetch(`https://equran.id/api/v2/surat/${nomor}`, { next: { revalidate: 3600 } }),
+      fetch(`https://equran.id/api/v2/tafsir/${nomor}`, { next: { revalidate: 3600 } }),
+    ]);
+
+    const suratData = await suratRes.json();
+    const tafsirData = await tafsirRes.json();
+
+    return {
+      surat: suratData?.data || null,
+      tafsir: tafsirData?.data || null,
+    };
+  } catch (error) {
+    console.error("Gagal memuat data surat/tafsir:", error);
+    return { surat: null, tafsir: null };
+  }
 }
 
-export default async function SuratDetail({ params }) {
-  const surat = await getDetailSurat(params.nomor)
-  const audio = surat.audioFull;
-  const reciters = {
-    '01': 'Abdullah-Al-Juhany',
-    '02': 'Abdul-Muhsin-Al-Qasim',
-    '03': 'Abdurrahman-as-Sudais',
-    '04': 'Ibrahim-Al-Dossari',
-    '05': 'Misyari-Rasyid-Al-Afasi'
-};
-  console.log(audio);
+export async function generateMetadata({ params }) {
+  try {
+    const res = await fetch(`https://equran.id/api/v2/surat/${params.nomor}`);
+    const data = await res.json();
+    if (data?.data) {
+      return {
+        title: `Surat ${data.data.namaLatin} (${data.data.nama}) - Qur'an App`,
+        description: `Baca teks Arab, terjemahan, dengarkan murattal, mode hafalan, dan tadabbur Surat ${data.data.namaLatin}.`,
+      };
+    }
+  } catch (e) {
+    // fallback
+  }
+  return {
+    title: "Surat - Qur'an App",
+  };
+}
+
+export default async function SuratPage({ params, searchParams }) {
+  const { surat, tafsir } = await getSuratData(params.nomor);
+  const initialMode = searchParams?.mode || "read";
+
+  if (!surat) {
     return (
-      <div className='max-w-6xl mx-auto'>
-        <h1 className='font-bold p-5 text-center text-4xl'>NGAJI SEK </h1>
-        <div className='flex justify-end'>
-          <Link href='/' className='hover:underline'>Kembali Home</Link>
-        </div>
-        <hr className='mb-4'/>
-        <div className='grid grid-cols-7 gap-3'>
-            <div className='col-span-7'>
-              <div className='border h-full p-3'>
-                  <div className='detail'>
-                  <div>
-                      <h1 className='font-bold p-5 text-center'>{surat.namaLatin} ({surat.nama})</h1>
-                      <div className='border p-5'>
-                        <p><strong>Arti:</strong> {surat.arti}</p>
-                        <p><strong>Jumlah Ayat:</strong> {surat.jumlahAyat}</p>
-                        <p><strong>Tempat Turun:</strong> {surat.tempatTurun}</p>
-                        <hr/>
-                        <h4 className='font-bold p-3'>Audio Playlist : </h4>
-                        <div className='grid md:grid-cols-3 gap-3'>
-                          {Object.keys(surat.audioFull).map((key) => (
-                              <div key={key} className='mb-4 border p-3'>
-                                  <p className='text-center'><strong>{reciters[key]}</strong></p>
-                                  <hr className='my-2'/>
-                                  <audio className='w-full' controls >
-                                      <source src={surat.audioFull[key]} type="audio/mpeg" />
-                                      Your browser does not support the audio element.
-                                  </audio>
-                              </div>
-                          ))}
-                        </div>
-                        <h2>Ayat:</h2>
-                        {surat.ayat.map((ayat) => (
-                            <>
-                            <div className='flex flex-col p-2 gap-3'>
-                              <div>
-                                  <h4 className='text-lg font-bold'>{ayat.teksArab} </h4>
-                                  <small className='text-xs italic'>{ayat.teksIndonesia}</small>
-                              </div>
-                              <hr/>
-                              {/* <p key={ayat.nomorAyat}><strong>{ayat.nomorAyat}</strong>:
-                              - </p> */}
-                            </div>
-                            </>
-                        ))}
-                      </div>
-                  </div>
-                  </div>
-              </div>
-            </div>
-          
+      <div className="min-h-screen flex items-center justify-center p-6 text-center">
+        <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-md max-w-sm">
+          <span className="text-4xl mb-3 block">⚠️</span>
+          <h2 className="text-lg font-bold text-stone-900 mb-2">Surat Tidak Ditemukan</h2>
+          <p className="text-xs text-stone-500 mb-4">
+            Terjadi kendala saat memuat data surat nomor {params.nomor}.
+          </p>
+          <a
+            href="/"
+            className="inline-block px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl"
+          >
+            Kembali ke Beranda
+          </a>
         </div>
       </div>
-    )
+    );
+  }
+
+  return <SuratDetailView surat={surat} tafsirData={tafsir} initialMode={initialMode} />;
 }

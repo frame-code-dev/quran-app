@@ -1,29 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --font-arabic: 'Amiri', 'Traditional Arabic', serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html {
+  scroll-behavior: smooth;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  /* color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb)); */
+  background-color: #FAF9F5;
+  color: #1C1917;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.font-arabic {
+  font-family: var(--font-arabic);
+  direction: rtl;
+  text-align: right;
+  line-height: 2.3;
+}
+
+/* Active Ayat being recited styling: BOLD, elevated, with emerald spine */
+.ayat-active-reciting {
+  background-color: #F0F7F4 !important;
+  border-color: #2D6A4F !important;
+  border-left-width: 4px !important;
+  box-shadow: 0 4px 16px -2px rgba(45, 106, 79, 0.12) !important;
+  transform: translateY(-1px);
+}
+
+.ayat-active-reciting .font-arabic {
+  font-weight: 700 !important;
+  color: #0D281E !important;
+  text-shadow: 0 0 1px rgba(13, 40, 30, 0.2);
+}
+
+@keyframes wave-pulse {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+.audio-bar-1 { animation: wave-pulse 1s infinite ease-in-out; }
+.audio-bar-2 { animation: wave-pulse 1.2s infinite ease-in-out 0.2s; }
+.audio-bar-3 { animation: wave-pulse 0.9s infinite ease-in-out 0.4s; }
+
+/* Custom scrollbar for minimalist clean design */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Blur tap reveal utility */
+.blur-reveal-hidden {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter 0.3s ease;
+}
+.blur-reveal-hidden:hover {
+  filter: blur(4px);
 }
 
 @layer utilities {

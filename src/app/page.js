@@ -1,25 +1,25 @@
+import React from "react";
+import HomeClientView from "@/components/HomeClientView";
 
-// pages/index.js
-import React from 'react';
-import ListSurat from './pages/surat/List';
-export default async function Home(){
-      return (
-          <div className='max-w-6xl mx-auto'>
-            <h1 className='font-bold p-5 text-center text-4xl'>NGAJI SEK </h1>
-            <small>Developed By : Rifjan Jundila </small>
-            <hr className='mb-4'/>
-            <div className='grid md:grid-cols-7 gap-3'>
-                <ListSurat/>
-                <div className='col-span-5'>
-                  <div className='border h-full p-3'>
-                      <div className='detail'>
-                        <h2>Surat</h2>
-                      </div>
-                  </div>
-                </div>
-              
-            </div>
-          </div>
-        );
+async function getSuratList() {
+  try {
+    const res = await fetch("https://equran.id/api/v2/surat", {
+      next: { revalidate: 86400 }, // Cache for 24 hours
+    });
+    const json = await res.json();
+    return json?.data || [];
+  } catch (error) {
+    console.error("Gagal mengambil data surat:", error);
+    return [];
+  }
 }
-  
+
+export const metadata = {
+  title: "Qur'an App - Read, Listen, Memorize, Reflect",
+  description: "Platform Al-Qur'an digital modern dan minimalis dengan 4 pilar utama: Read, Listen, Memorize, dan Reflect.",
+};
+
+export default async function Home() {
+  const suratList = await getSuratList();
+  return <HomeClientView initialSuratList={suratList} />;
+}
