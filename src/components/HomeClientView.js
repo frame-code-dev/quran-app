@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X } from "lucide-react";
 import Navbar from "./Navbar";
@@ -29,6 +29,7 @@ export default function HomeClientView({ initialSuratList = [] }) {
 
   // Audio & Reflection state
   const [currentTrack, setCurrentTrack] = useState(null);
+  const [currentPlayingSuratNomor, setCurrentPlayingSuratNomor] = useState(null);
   const [reciterKey, setReciterKey] = useState("05");
   const [repeatCount, setRepeatCount] = useState(1);
   const [reflectionAyat, setReflectionAyat] = useState(null);
@@ -73,17 +74,37 @@ export default function HomeClientView({ initialSuratList = [] }) {
     setIsReflectionOpen(true);
   };
 
-  const handleQuickPlay = (surat) => {
-    const audioUrl = surat.audioFull?.[reciterKey] || Object.values(surat.audioFull || {})[0];
-    setCurrentTrack({
-      title: `QS. ${surat.namaLatin} (Full Surat)`,
-      audioUrl: audioUrl,
-      ayatNomor: null,
-      totalAyat: surat.jumlahAyat,
-      onNext: null,
-      onPrev: null,
-    });
-  };
+  const handleQuickPlay = useCallback(
+    (suratItem) => {
+      const audioUrl =
+        suratItem.audioFull?.[reciterKey] || Object.values(suratItem.audioFull || {})[0];
+      setCurrentPlayingSuratNomor(suratItem.nomor);
+      setCurrentTrack({
+        title: `QS. ${suratItem.namaLatin} (Full Surat)`,
+        audioUrl: audioUrl,
+        ayatNomor: null,
+        totalAyat: suratItem.jumlahAyat,
+        suratNamaLatin: suratItem.namaLatin,
+      });
+    },
+    [reciterKey]
+  );
+
+  const handleNextSuratHome = useCallback(() => {
+    if (!currentPlayingSuratNomor || !initialSuratList.length) return;
+    const currentIdx = initialSuratList.findIndex((s) => s.nomor === currentPlayingSuratNomor);
+    if (currentIdx !== -1 && currentIdx + 1 < initialSuratList.length) {
+      handleQuickPlay(initialSuratList[currentIdx + 1]);
+    }
+  }, [currentPlayingSuratNomor, initialSuratList, handleQuickPlay]);
+
+  const handlePrevSuratHome = useCallback(() => {
+    if (!currentPlayingSuratNomor || !initialSuratList.length) return;
+    const currentIdx = initialSuratList.findIndex((s) => s.nomor === currentPlayingSuratNomor);
+    if (currentIdx > 0) {
+      handleQuickPlay(initialSuratList[currentIdx - 1]);
+    }
+  }, [currentPlayingSuratNomor, initialSuratList, handleQuickPlay]);
 
   return (
     <div
@@ -340,11 +361,16 @@ export default function HomeClientView({ initialSuratList = [] }) {
       {/* Floating Sticky Audio Player Bar */}
       <AudioPlayerBar
         currentTrack={currentTrack}
-        onClose={() => setCurrentTrack(null)}
+        onClose={() => {
+          setCurrentTrack(null);
+          setCurrentPlayingSuratNomor(null);
+        }}
         reciterKey={reciterKey}
         setReciterKey={setReciterKey}
         repeatCount={repeatCount}
         setRepeatCount={setRepeatCount}
+        onNext={handleNextSuratHome}
+        onPrev={handlePrevSuratHome}
       />
 
       {/* Tadabbur & AI Reflection Modal */}

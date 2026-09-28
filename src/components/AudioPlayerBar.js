@@ -83,6 +83,14 @@ export default function AudioPlayerBar({
             console.warn("Audio playback notice:", err);
           });
       }
+    } else if (audio.paused) {
+      audio
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          onPlayStateChangeRef.current?.(true);
+        })
+        .catch((err) => console.warn("Audio playback resume notice:", err));
     }
   }, [currentTrack?.audioUrl]);
 
@@ -203,6 +211,10 @@ export default function AudioPlayerBar({
         }
         setCurrentLoop(1);
         if (onTrackChange) onTrackChange(nextIndex);
+        return;
+      } else if (onNext) {
+        onNext();
+        return;
       }
     } else if (onNext) {
       onNext();
@@ -224,6 +236,10 @@ export default function AudioPlayerBar({
         }
         setCurrentLoop(1);
         if (onTrackChange) onTrackChange(prevIndex);
+        return;
+      } else if (onPrev) {
+        onPrev();
+        return;
       }
     } else if (onPrev) {
       onPrev();
@@ -239,11 +255,11 @@ export default function AudioPlayerBar({
 
   const hasNext =
     playlist && currentIndex !== null && currentIndex !== undefined
-      ? currentIndex < playlist.length - 1
+      ? currentIndex < playlist.length - 1 || !!onNext
       : !!onNext;
   const hasPrev =
     playlist && currentIndex !== null && currentIndex !== undefined
-      ? currentIndex > 0
+      ? currentIndex > 0 || !!onPrev
       : !!onPrev;
 
   const handleNextTrackRef = useRef(handleNextTrack);

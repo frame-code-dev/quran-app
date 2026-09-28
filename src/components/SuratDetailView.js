@@ -20,8 +20,12 @@ import BottomNav from "./BottomNav";
 import AudioPlayerBar, { RECITERS } from "./AudioPlayerBar";
 import MemorizeMode from "./MemorizeMode";
 import ReflectionModal from "./ReflectionModal";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SuratDetailView({ surat, tafsirData, initialMode = "read" }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [activeTab, setActiveTab] = useState(initialMode); // 'read' | 'listen' | 'memorize' | 'reflect'
   const [isMobileFrame, setIsMobileFrame] = useState(false);
 
@@ -30,9 +34,12 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
   const [showLatin, setShowLatin] = useState(true);
   const [showTranslation, setShowTranslation] = useState(true);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [autoNextSurat, setAutoNextSurat] = useState(true);
+  const [transitioningToNext, setTransitioningToNext] = useState(null);
 
   // Audio Player state
-  const [reciterKey, setReciterKey] = useState("05"); // Default: Misyari Rasyid
+  const initialReciter = searchParams?.get("reciter") || "05";
+  const [reciterKey, setReciterKey] = useState(initialReciter); // Default: Misyari Rasyid
   const [repeatCount, setRepeatCount] = useState(1);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [activeAyatIndex, setActiveAyatIndex] = useState(null);
@@ -56,10 +63,23 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
       if (saved) {
         setSavedLastRead(JSON.parse(saved));
       }
+      const savedAutoNext = localStorage.getItem("quran_auto_next");
+      if (savedAutoNext !== null) {
+        setAutoNextSurat(savedAutoNext === "true");
+      }
     } catch (e) {
       // ignore
     }
   }, []);
+
+  const handleToggleAutoNext = (val) => {
+    setAutoNextSurat(val);
+    try {
+      localStorage.setItem("quran_auto_next", String(val));
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Auto-scroll to active reciting ayah
   useEffect(() => {
@@ -87,28 +107,31 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
   };
 
   // Play verse by index in surat.ayat array
-  const playAyatIndex = (index, customRepeat = 1) => {
-    if (!surat.ayat || index < 0 || index >= surat.ayat.length) return;
-    const ayat = surat.ayat[index];
-    setActiveAyatIndex(index);
-    if (customRepeat !== undefined) {
-      setRepeatCount(customRepeat);
-    }
+  const playAyatIndex = useCallback(
+    (index, customRepeat = 1) => {
+      if (!surat.ayat || index < 0 || index >= surat.ayat.length) return;
+      const ayat = surat.ayat[index];
+      setActiveAyatIndex(index);
+      if (customRepeat !== undefined) {
+        setRepeatCount(customRepeat);
+      }
 
-    const audioUrl = ayat.audio?.[reciterKey] || Object.values(ayat.audio || {})[0];
-    setCurrentTrack({
-      title: `QS. ${surat.namaLatin} : Ayat ${ayat.nomorAyat}`,
-      audioUrl: audioUrl,
-      ayatNomor: ayat.nomorAyat,
-      ayatIndex: index,
-      totalAyat: surat.jumlahAyat,
-      teksArab: ayat.teksArab,
-      teksIndonesia: ayat.teksIndonesia,
-      teksLatin: ayat.teksLatin,
-      suratNamaLatin: surat.namaLatin,
-    });
-    setIsPlayingAudio(true);
-  };
+      const audioUrl = ayat.audio?.[reciterKey] || Object.values(ayat.audio || {})[0];
+      setCurrentTrack({
+        title: `QS. ${surat.namaLatin} : Ayat ${ayat.nomorAyat}`,
+        audioUrl: audioUrl,
+        ayatNomor: ayat.nomorAyat,
+        ayatIndex: index,
+        totalAyat: surat.jumlahAyat,
+        teksArab: ayat.teksArab,
+        teksIndonesia: ayat.teksIndonesia,
+        teksLatin: ayat.teksLatin,
+        suratNamaLatin: surat.namaLatin,
+      });
+      setIsPlayingAudio(true);
+    },
+    [surat, reciterKey]
+  );
 
   const playAyat = (ayat, customRepeat = 1) => {
     const idx = surat.ayat.findIndex((a) => a.nomorAyat === ayat.nomorAyat);
@@ -135,6 +158,42 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
       playAyatIndex(0, 1);
     }
   };
+
+  // Next & Previous Surat Navigation
+  const handleNextSurat = useCallback(() => {
+    if (surat?.suratSelanjutnya?.nomor) {
+      setTransitioningToNext(surat.suratSelanjutnya.namaLatin);
+      router.push(
+        `/surat/${surat.suratSelanjutnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}`
+      );
+    }
+  }, [surat?.suratSelanjutnya, reciterKey, activeTab, router]);
+
+  const handlePrevSurat = useCallback(() => {
+    if (surat?.suratSebelumnya?.nomor) {
+      router.push(
+        `/surat/${surat.suratSebelumnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}`
+      );
+    }
+  }, [surat?.suratSebelumnya, reciterKey, activeTab, router]);
+
+  // Auto-play when navigated with ?autoplay=true
+  useEffect(() => {
+    const isAutoPlay = searchParams?.get("autoplay") === "true";
+    if (isAutoPlay && surat?.ayat?.length > 0) {
+      const timer = setTimeout(() => {
+        playAyatIndex(0, 1);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [surat?.nomor, surat?.ayat?.length, searchParams, playAyatIndex]);
+
+  // Prefetch next surat for instantaneous transition
+  useEffect(() => {
+    if (surat?.suratSelanjutnya?.nomor) {
+      router.prefetch(`/surat/${surat.suratSelanjutnya.nomor}`);
+    }
+  }, [surat?.suratSelanjutnya?.nomor, router]);
 
   // Open AI reflection modal for an ayat
   const openReflection = (ayat) => {
@@ -333,6 +392,15 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                     className="accent-emerald-700 rounded"
                   />
                   <span>Ikuti Suara (Auto-scroll)</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoNextSurat}
+                    onChange={(e) => handleToggleAutoNext(e.target.checked)}
+                    className="accent-emerald-700 rounded"
+                  />
+                  <span>Auto-Next Surat</span>
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
                   <input
@@ -716,7 +784,17 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
         setRepeatCount={setRepeatCount}
         onPlayStateChange={handlePlayStateChange}
         toggleRef={audioToggleRef}
+        onNext={autoNextSurat && surat?.suratSelanjutnya?.nomor ? handleNextSurat : null}
+        onPrev={surat?.suratSebelumnya?.nomor ? handlePrevSurat : null}
       />
+
+      {/* Floating Transition Indicator */}
+      {transitioningToNext && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-emerald-950/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-emerald-700/80 text-xs font-semibold flex items-center gap-2.5 animate-pulse">
+          <Headphones className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>Melanjutkan lantunan ke QS. {transitioningToNext}...</span>
+        </div>
+      )}
 
       {/* Tadabbur AI Reflection Modal */}
       <ReflectionModal
