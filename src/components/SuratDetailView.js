@@ -21,6 +21,7 @@ import AudioPlayerBar, { RECITERS } from "./AudioPlayerBar";
 import MemorizeMode from "./MemorizeMode";
 import ReflectionModal from "./ReflectionModal";
 import { useRouter, useSearchParams } from "next/navigation";
+import ambientEngine from "@/utils/ambientSound";
 
 export default function SuratDetailView({ surat, tafsirData, initialMode = "read" }) {
   const router = useRouter();
@@ -44,7 +45,59 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
   const [currentTrack, setCurrentTrack] = useState(null);
   const [activeAyatIndex, setActiveAyatIndex] = useState(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const initialZen = searchParams?.get("zen") === "true";
+  const [isZenOpen, setIsZenOpen] = useState(initialZen);
   const audioToggleRef = useRef(null);
+
+  // Confirmation modal when returning to home while audio is active
+  const [isBackConfirmOpen, setIsBackConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams?.get("zen") === "true") {
+      setIsZenOpen(true);
+    }
+  }, [searchParams]);
+
+  const handleBackClick = (e) => {
+    if (e) e.preventDefault();
+    if (isPlayingAudio || currentTrack) {
+      setIsBackConfirmOpen(true);
+    } else {
+      router.push("/");
+    }
+  };
+
+  const handleContinuePlaybackHome = () => {
+    try {
+      sessionStorage.setItem(
+        "quran_playback_transfer",
+        JSON.stringify({
+          currentTrack,
+          reciterKey,
+          repeatCount,
+          playlist: surat.ayat,
+          currentIndex: activeAyatIndex,
+          isPlaying: isPlayingAudio,
+        })
+      );
+    } catch (e) {}
+    setIsBackConfirmOpen(false);
+    router.push("/");
+  };
+
+  const handleStopAndGoHome = () => {
+    if (audioToggleRef.current && isPlayingAudio) {
+      audioToggleRef.current();
+    }
+    if (ambientEngine) {
+      ambientEngine.stopAll();
+    }
+    try {
+      sessionStorage.removeItem("quran_playback_transfer");
+    } catch (e) {}
+    setIsBackConfirmOpen(false);
+    router.push("/");
+  };
 
   const handlePlayStateChange = useCallback((playing) => {
     setIsPlayingAudio(playing);
@@ -159,23 +212,33 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
     }
   };
 
+  // Open Animated Zen Recitation Mode
+  const openZenMode = () => {
+    if (!currentTrack) {
+      playSuratSequential();
+    }
+    setIsZenOpen(true);
+  };
+
   // Next & Previous Surat Navigation
   const handleNextSurat = useCallback(() => {
     if (surat?.suratSelanjutnya?.nomor) {
       setTransitioningToNext(surat.suratSelanjutnya.namaLatin);
+      const zenParam = isZenOpen ? "&zen=true" : "";
       router.push(
-        `/surat/${surat.suratSelanjutnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}`
+        `/surat/${surat.suratSelanjutnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}${zenParam}`
       );
     }
-  }, [surat?.suratSelanjutnya, reciterKey, activeTab, router]);
+  }, [surat?.suratSelanjutnya, reciterKey, activeTab, isZenOpen, router]);
 
   const handlePrevSurat = useCallback(() => {
     if (surat?.suratSebelumnya?.nomor) {
+      const zenParam = isZenOpen ? "&zen=true" : "";
       router.push(
-        `/surat/${surat.suratSebelumnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}`
+        `/surat/${surat.suratSebelumnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}${zenParam}`
       );
     }
-  }, [surat?.suratSebelumnya, reciterKey, activeTab, router]);
+  }, [surat?.suratSebelumnya, reciterKey, activeTab, isZenOpen, router]);
 
   // Auto-play when navigated with ?autoplay=true
   useEffect(() => {
@@ -242,13 +305,13 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
       <main className="mt-4 sm:mt-6 space-y-6">
         {/* Top Breadcrumb & Back */}
         <div className="flex items-center justify-between gap-2 px-1">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 px-3 py-1.5 rounded-xl transition-colors border border-stone-200"
+          <button
+            onClick={handleBackClick}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 px-3 py-1.5 rounded-xl transition-colors border border-stone-200 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Kembali ke Beranda</span>
-          </Link>
+          </button>
 
           <div className="flex items-center gap-1 text-xs">
             {surat.suratSebelumnya && (
@@ -298,6 +361,14 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Putar Surat (Sinkron Ayat)</span>
+              </button>
+              <button
+                onClick={openZenMode}
+                className="inline-flex items-center gap-1.5 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-emerald-400/30 shadow-xs"
+                title="Buka Mode Animasi Sinematik & Suara Alam"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                <span>Mode Animasi & Alam</span>
               </button>
               <button
                 onClick={() => setActiveTab("memorize")}
@@ -784,6 +855,9 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
         setRepeatCount={setRepeatCount}
         onPlayStateChange={handlePlayStateChange}
         toggleRef={audioToggleRef}
+        isZenOpenExternal={isZenOpen}
+        setIsZenOpenExternal={setIsZenOpen}
+        transitioningToNext={transitioningToNext}
         onNext={autoNextSurat && surat?.suratSelanjutnya?.nomor ? handleNextSurat : null}
         onPrev={surat?.suratSebelumnya?.nomor ? handlePrevSurat : null}
       />
@@ -805,6 +879,48 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
 
       {/* Bottom Navigation for Mobile Device */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* Confirmation Modal: Kembali ke Beranda */}
+      {isBackConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-sm animate-fade-in-up">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full border border-stone-200 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-sm">
+              <Headphones className="w-6 h-6 animate-pulse" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-lg text-stone-900">Audio Masih Diputar</h3>
+              <p className="text-xs text-stone-500 leading-relaxed">
+                Lantunan <span className="font-semibold text-stone-800">{currentTrack?.title || "Al-Qur'an"}</span> sedang aktif. Ingin tetap mendengarkan di beranda atau menghentikannya?
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={handleContinuePlaybackHome}
+                className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Tetap Lanjutkan di Beranda</span>
+              </button>
+
+              <button
+                onClick={handleStopAndGoHome}
+                className="w-full py-2.5 px-4 bg-stone-100 hover:bg-red-50 text-stone-700 hover:text-red-700 text-xs font-semibold rounded-xl transition-colors border border-stone-200 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>Hentikan Audio</span>
+              </button>
+
+              <button
+                onClick={() => setIsBackConfirmOpen(false)}
+                className="w-full py-2 text-xs text-stone-400 hover:text-stone-600 font-medium transition-colors cursor-pointer"
+              >
+                Batal (Tetap di Surat Ini)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -34,12 +34,26 @@ export default function HomeClientView({ initialSuratList = [] }) {
   const [repeatCount, setRepeatCount] = useState(1);
   const [reflectionAyat, setReflectionAyat] = useState(null);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+  const [transferredPlaylist, setTransferredPlaylist] = useState(null);
+  const [transferredIndex, setTransferredIndex] = useState(null);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("quran_last_read");
       if (saved) {
         setLastRead(JSON.parse(saved));
+      }
+      const transfer = sessionStorage.getItem("quran_playback_transfer");
+      if (transfer) {
+        const data = JSON.parse(transfer);
+        if (data?.currentTrack) {
+          setCurrentTrack(data.currentTrack);
+          if (data.reciterKey) setReciterKey(data.reciterKey);
+          if (data.repeatCount) setRepeatCount(data.repeatCount);
+          if (data.playlist) setTransferredPlaylist(data.playlist);
+          if (data.currentIndex !== undefined) setTransferredIndex(data.currentIndex);
+        }
+        sessionStorage.removeItem("quran_playback_transfer");
       }
     } catch (e) {
       // ignore
@@ -361,9 +375,29 @@ export default function HomeClientView({ initialSuratList = [] }) {
       {/* Floating Sticky Audio Player Bar */}
       <AudioPlayerBar
         currentTrack={currentTrack}
+        playlist={transferredPlaylist}
+        currentIndex={transferredIndex}
+        onTrackChange={(newIdx) => {
+          if (transferredPlaylist && transferredPlaylist[newIdx]) {
+            setTransferredIndex(newIdx);
+            const ayat = transferredPlaylist[newIdx];
+            const audioUrl = ayat.audio?.[reciterKey] || Object.values(ayat.audio || {})[0];
+            setCurrentTrack((prev) => ({
+              ...prev,
+              audioUrl,
+              ayatNomor: ayat.nomorAyat,
+              teksArab: ayat.teksArab,
+              teksIndonesia: ayat.teksIndonesia,
+              teksLatin: ayat.teksLatin,
+              title: prev?.suratNamaLatin ? `QS. ${prev.suratNamaLatin} : Ayat ${ayat.nomorAyat}` : prev?.title,
+            }));
+          }
+        }}
         onClose={() => {
           setCurrentTrack(null);
           setCurrentPlayingSuratNomor(null);
+          setTransferredPlaylist(null);
+          setTransferredIndex(null);
         }}
         reciterKey={reciterKey}
         setReciterKey={setReciterKey}

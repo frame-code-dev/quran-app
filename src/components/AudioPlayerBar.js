@@ -14,8 +14,10 @@ import {
   Maximize2,
   Minimize2,
   PictureInPicture2,
+  Sparkles,
   X,
 } from "lucide-react";
+import AnimatedZenPlayer from "./AnimatedZenPlayer";
 
 export const RECITERS = {
   "05": { name: "Misyari Rasyid Al-Afasi", slug: "Misyari-Rasyid-Al-Afasi" },
@@ -39,6 +41,9 @@ export default function AudioPlayerBar({
   onNext,
   onPrev,
   toggleRef,
+  isZenOpenExternal,
+  setIsZenOpenExternal,
+  transitioningToNext,
 }) {
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -46,6 +51,11 @@ export default function AudioPlayerBar({
   const [duration, setDuration] = useState(0);
   const [currentLoop, setCurrentLoop] = useState(1);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Animated Zen Mode (Cinematic reciting + background + nature soundscape)
+  const [internalZenOpen, setInternalZenOpen] = useState(false);
+  const isZenOpen = isZenOpenExternal !== undefined ? isZenOpenExternal : internalZenOpen;
+  const setIsZenOpen = setIsZenOpenExternal || setInternalZenOpen;
 
   // Picture-in-Picture State
   const [isPipActive, setIsPipActive] = useState(false);
@@ -528,6 +538,14 @@ export default function AudioPlayerBar({
               </button>
 
               <button
+                onClick={() => setIsZenOpen(true)}
+                className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-stone-800 transition-colors"
+                title="Buka Mode Animasi (Sinematik & Suara Alam)"
+              >
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+              </button>
+
+              <button
                 onClick={togglePictureInPicture}
                 className={`p-1.5 rounded-lg transition-colors ${
                   isPipActive
@@ -598,6 +616,16 @@ export default function AudioPlayerBar({
                     ))}
                   </select>
                 )}
+
+                {/* Animated Zen Mode Button */}
+                <button
+                  onClick={() => setIsZenOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-900/80 hover:bg-emerald-800 text-emerald-300 hover:text-white border border-emerald-700/60 flex items-center gap-1.5 text-xs font-semibold transition-colors shadow-xs"
+                  title="Buka Mode Animasi Sinematik & Suara Alam (Hujan, Angin, dll)"
+                >
+                  <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+                  <span className="hidden sm:inline">Animasi</span>
+                </button>
 
                 {/* Picture-in-Picture Button */}
                 <button
@@ -737,6 +765,29 @@ export default function AudioPlayerBar({
           />,
           pipContainer
         )}
+
+      {/* Fullscreen Animated Zen Recitation Player */}
+      <AnimatedZenPlayer
+        isOpen={isZenOpen}
+        onClose={() => setIsZenOpen(false)}
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        togglePlay={togglePlay}
+        handleNextTrack={handleNextTrack}
+        handlePrevTrack={handlePrevTrack}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        currentTime={currentTime}
+        duration={duration}
+        handleSeek={handleSeek}
+        formatTime={formatTime}
+        reciterKey={reciterKey}
+        setReciterKey={setReciterKey}
+        repeatCount={repeatCount}
+        setRepeatCount={setRepeatCount}
+        currentLoop={currentLoop}
+        transitioningToNext={transitioningToNext}
+      />
     </>
   );
 }

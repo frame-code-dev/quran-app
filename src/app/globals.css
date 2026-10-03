@@ -84,3 +84,44 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Cinematic Zen Player Animations */
+@keyframes kenburns {
+  0% {
+    transform: scale(1.0) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+  100% {
+    transform: scale(1.0) translate(0, 0);
+  }
+}
+
+.animate-kenburns {
+  animation: kenburns 35s ease-in-out infinite alternate;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Text glow for high contrast on cinematic backgrounds */
+.quran-arabic-glow {
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.85), 0 0 40px rgba(16, 185, 129, 0.25);
+}
+
+.quran-text-glow {
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
