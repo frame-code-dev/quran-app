@@ -283,10 +283,12 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
 
   return (
     <div
-      className={`min-h-screen transition-all duration-300 pb-28 ${
+      className={`min-h-screen transition-all duration-300 ${
+        currentTrack ? "pb-44 sm:pb-36" : "pb-28"
+      } ${
         isMobileFrame
           ? "max-w-md mx-auto my-4 sm:my-8 bg-white border-4 border-stone-800 rounded-[2.5rem] shadow-2xl overflow-hidden relative"
-          : "max-w-5xl mx-auto px-4 sm:px-6"
+          : "max-w-5xl mx-auto px-3 sm:px-6"
       }`}
     >
       {/* Mobile Frame Speaker / Camera Notch if in Mobile Frame Mode */}
@@ -304,34 +306,34 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
 
       <main className="mt-4 sm:mt-6 space-y-6">
         {/* Top Breadcrumb & Back */}
-        <div className="flex items-center justify-between gap-2 px-1">
+        <div className="flex items-center justify-between gap-2 px-0.5">
           <button
             onClick={handleBackClick}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 px-3 py-1.5 rounded-xl transition-colors border border-stone-200 cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 px-2.5 sm:px-3 py-1.5 rounded-xl transition-colors border border-stone-200 cursor-pointer shadow-xs shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Kembali ke Beranda</span>
+            <span>Beranda</span>
           </button>
 
-          <div className="flex items-center gap-1 text-xs">
+          <div className="flex items-center gap-1 text-xs truncate">
             {surat.suratSebelumnya && (
               <Link
                 href={`/surat/${surat.suratSebelumnya.nomor}`}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-stone-600 hover:text-emerald-900 hover:bg-stone-100 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 text-stone-600 hover:text-emerald-900 hover:bg-stone-100 rounded-lg transition-colors truncate max-w-[110px] sm:max-w-none"
                 title={`Sebelumnya: ${surat.suratSebelumnya.namaLatin}`}
               >
-                <ChevronLeft className="w-3 h-3" />
-                <span>{surat.suratSebelumnya.namaLatin}</span>
+                <ChevronLeft className="w-3 h-3 shrink-0" />
+                <span className="truncate">{surat.suratSebelumnya.namaLatin}</span>
               </Link>
             )}
             {surat.suratSelanjutnya && (
               <Link
                 href={`/surat/${surat.suratSelanjutnya.nomor}`}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-stone-600 hover:text-emerald-900 hover:bg-stone-100 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 text-stone-600 hover:text-emerald-900 hover:bg-stone-100 rounded-lg transition-colors truncate max-w-[110px] sm:max-w-none"
                 title={`Selanjutnya: ${surat.suratSelanjutnya.namaLatin}`}
               >
-                <span>{surat.suratSelanjutnya.namaLatin}</span>
-                <ChevronRight className="w-3 h-3" />
+                <span className="truncate">{surat.suratSelanjutnya.namaLatin}</span>
+                <ChevronRight className="w-3 h-3 shrink-0" />
               </Link>
             )}
           </div>
@@ -421,14 +423,14 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
         {activeTab === "read" && (
           <div className="space-y-4">
             {/* Reading Options Bar */}
-            <div className="bg-white rounded-2xl p-3.5 border border-stone-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-stone-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               {/* Font size adjustment */}
-              <div className="flex items-center gap-2">
-                <span className="text-stone-500 font-medium">Ukuran Teks:</span>
+              <div className="flex items-center justify-between sm:justify-start gap-2">
+                <span className="text-stone-500 font-medium">Ukuran Teks Arab:</span>
                 <div className="flex items-center rounded-lg border border-stone-200 p-0.5 bg-stone-50">
                   <button
                     onClick={() => setArabicFontSize("small")}
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                    className={`px-2.5 py-1 rounded text-xs font-semibold ${
                       arabicFontSize === "small" ? "bg-white text-emerald-900 shadow-xs" : "text-stone-600"
                     }`}
                   >
@@ -436,7 +438,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                   </button>
                   <button
                     onClick={() => setArabicFontSize("normal")}
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                    className={`px-2.5 py-1 rounded text-xs font-semibold ${
                       arabicFontSize === "normal" ? "bg-white text-emerald-900 shadow-xs" : "text-stone-600"
                     }`}
                   >
@@ -444,7 +446,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                   </button>
                   <button
                     onClick={() => setArabicFontSize("large")}
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                    className={`px-2.5 py-1 rounded text-xs font-semibold ${
                       arabicFontSize === "large" ? "bg-white text-emerald-900 shadow-xs" : "text-stone-600"
                     }`}
                   >
@@ -453,8 +455,8 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                 </div>
               </div>
 
-              {/* Toggles */}
-              <div className="flex items-center gap-4">
+              {/* Toggles grid in mobile */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
                 <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
                   <input
                     type="checkbox"
@@ -462,7 +464,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                     onChange={(e) => setAutoScrollEnabled(e.target.checked)}
                     className="accent-emerald-700 rounded"
                   />
-                  <span>Ikuti Suara (Auto-scroll)</span>
+                  <span className="truncate">Auto-scroll</span>
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
                   <input
@@ -471,7 +473,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                     onChange={(e) => handleToggleAutoNext(e.target.checked)}
                     className="accent-emerald-700 rounded"
                   />
-                  <span>Auto-Next Surat</span>
+                  <span className="truncate">Auto-Next Surat</span>
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
                   <input
@@ -519,7 +521,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                   <div
                     key={ayat.nomorAyat}
                     id={`ayat-${ayat.nomorAyat}`}
-                    className={`rounded-2xl border transition-all duration-300 p-5 ${
+                    className={`rounded-2xl border transition-all duration-300 p-3.5 sm:p-5 ${
                       isPlayingThis
                         ? "ayat-active-reciting"
                         : isBookmarked
@@ -528,10 +530,10 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                     }`}
                   >
                     {/* Verse Toolbar */}
-                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-stone-100">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-stone-100 gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
                         <span
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs border ${
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border ${
                             isPlayingThis
                               ? "bg-emerald-800 text-white border-emerald-800"
                               : "bg-stone-100 text-stone-700 border-stone-200/60"

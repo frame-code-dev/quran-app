@@ -2,23 +2,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X } from "lucide-react";
+import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X, Shuffle } from "lucide-react";
 import Navbar from "./Navbar";
 import BottomNav from "./BottomNav";
 import SuratCard from "./SuratCard";
 import AudioPlayerBar from "./AudioPlayerBar";
 import ReflectionModal from "./ReflectionModal";
-
-// Ayat harian yang menyejukkan hati untuk refleksi
-const DAILY_VERSE = {
-  suratNomor: 94,
-  suratNamaLatin: "Al-Insyirah",
-  nomorAyat: 6,
-  teksArab: "إِنَّ مَعَ الْعُسْرِ يُسْرًا",
-  teksLatin: "Inna ma'al-'usri yusrā(n).",
-  teksIndonesia: "Sesungguhnya beserta kesulitan itu ada kemudahan.",
-  tafsir: "Ayat ini mengulang penegasan bahwa setiap kali kesulitan mendera seorang hamba, Allah telah menyertakan kemudahan di dalamnya. Ini adalah jaminan ketenangan bagi siapa pun yang sedang berjuang dalam kehidupan.",
-};
+import { getDailyVerse, getRandomVerse } from "@/utils/dailyVerse";
 
 export default function HomeClientView({ initialSuratList = [] }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,6 +16,9 @@ export default function HomeClientView({ initialSuratList = [] }) {
   const [activeTab, setActiveTab] = useState("read"); // 'read' | 'listen' | 'memorize' | 'reflect'
   const [isMobileFrame, setIsMobileFrame] = useState(false);
   const [lastRead, setLastRead] = useState(null);
+
+  // Daily verse state with date-based rotation
+  const [dailyVerse, setDailyVerse] = useState(() => getDailyVerse());
 
   // Audio & Reflection state
   const [currentTrack, setCurrentTrack] = useState(null);
@@ -36,6 +29,11 @@ export default function HomeClientView({ initialSuratList = [] }) {
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
   const [transferredPlaylist, setTransferredPlaylist] = useState(null);
   const [transferredIndex, setTransferredIndex] = useState(null);
+
+  useEffect(() => {
+    // Sync with today's verse on client mount (handles local timezone accurately)
+    setDailyVerse(getDailyVerse());
+  }, []);
 
   useEffect(() => {
     try {
@@ -84,8 +82,13 @@ export default function HomeClientView({ initialSuratList = [] }) {
   }, [initialSuratList, searchQuery, category]);
 
   const handleOpenDailyReflection = () => {
-    setReflectionAyat(DAILY_VERSE);
+    setReflectionAyat(dailyVerse);
     setIsReflectionOpen(true);
+  };
+
+  const handleShuffleDailyVerse = () => {
+    const next = getRandomVerse(dailyVerse?.index);
+    setDailyVerse(next);
   };
 
   const handleQuickPlay = useCallback(
@@ -122,10 +125,12 @@ export default function HomeClientView({ initialSuratList = [] }) {
 
   return (
     <div
-      className={`min-h-screen transition-all duration-300 pb-28 ${
+      className={`min-h-screen transition-all duration-300 ${
+        currentTrack ? "pb-44 sm:pb-36" : "pb-28"
+      } ${
         isMobileFrame
           ? "max-w-md mx-auto my-4 sm:my-8 bg-white border-4 border-stone-800 rounded-[2.5rem] shadow-2xl overflow-hidden relative"
-          : "max-w-5xl mx-auto px-4 sm:px-6"
+          : "max-w-5xl mx-auto px-3 sm:px-6"
       }`}
     >
       {/* Mobile Frame Speaker & Camera Notch */}
@@ -266,29 +271,47 @@ export default function HomeClientView({ initialSuratList = [] }) {
 
         {/* Daily Verse / Tadabbur Spotlight Card */}
         <div className="bg-[#F0F7F4] border border-[#A3CFBB]/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-          <div className="space-y-1 max-w-xl">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-emerald-900 bg-white border border-[#A3CFBB]/60 px-2 py-0.5 rounded-md flex items-center gap-1">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-emerald-900 bg-white border border-[#A3CFBB]/60 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                 <Sparkles className="w-3 h-3 text-emerald-800" />
                 <span>Ayat Hari Ini</span>
               </span>
-              <span className="text-xs text-stone-500">QS. {DAILY_VERSE.suratNamaLatin}: {DAILY_VERSE.nomorAyat}</span>
+              <span className="text-xs text-stone-500 font-medium">
+                QS. {dailyVerse?.suratNamaLatin}: {dailyVerse?.nomorAyat}
+              </span>
             </div>
-            <p className="font-arabic text-xl sm:text-2xl text-emerald-950 font-bold">
-              {DAILY_VERSE.teksArab}
+            <p className="font-arabic text-xl sm:text-2xl text-emerald-950 font-bold leading-relaxed pt-1">
+              {dailyVerse?.teksArab}
             </p>
-            <p className="text-xs sm:text-sm text-stone-700 italic">
-              &quot;{DAILY_VERSE.teksIndonesia}&quot;
+            {dailyVerse?.teksLatin && (
+              <p className="text-xs text-emerald-900/80 italic font-medium">
+                {dailyVerse?.teksLatin}
+              </p>
+            )}
+            <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
+              &quot;{dailyVerse?.teksIndonesia}&quot;
             </p>
           </div>
 
-          <button
-            onClick={handleOpenDailyReflection}
-            className="whitespace-nowrap px-4 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Tadabbur Sekarang</span>
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={handleShuffleDailyVerse}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white hover:bg-stone-50 text-stone-700 hover:text-emerald-900 border border-stone-200 text-xs font-semibold shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Ganti ke Ayat Renungan Lainnya"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="text-xs sm:inline">Acak Ayat</span>
+            </button>
+
+            <button
+              onClick={handleOpenDailyReflection}
+              className="flex-1 sm:flex-none whitespace-nowrap px-4 py-2.5 sm:py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Tadabbur Sekarang</span>
+            </button>
+          </div>
         </div>
 
         {/* Search & Category Filter Section */}

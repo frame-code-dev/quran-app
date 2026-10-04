@@ -297,35 +297,35 @@ export default function AnimatedZenPlayer({
       )}
 
       {/* 2. Top Navigation Bar */}
-      <header className="relative z-20 flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6">
+      <header className="relative z-20 flex items-center justify-between px-3 sm:px-8 py-3 sm:py-6 gap-2">
         {/* Surat & Ayah Badge */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-emerald-400 shadow-lg">
-            <Sparkles className="w-5 h-5 animate-pulse" />
+        <div className="flex items-center gap-2 sm:gap-3 truncate min-w-0 pr-1">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-emerald-400 shadow-lg shrink-0">
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Mode Animasi Sinematik
+          <div className="truncate min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Zen Mode
               </span>
               {currentTrack?.ayatNomor && (
-                <span className="text-[11px] text-stone-300 font-medium">
-                  Ayat {currentTrack.ayatNomor} {currentTrack.totalAyat ? `dari ${currentTrack.totalAyat}` : ""}
+                <span className="text-[10px] sm:text-[11px] text-stone-300 font-medium truncate">
+                  Ayat {currentTrack.ayatNomor} {currentTrack.totalAyat ? `/ ${currentTrack.totalAyat}` : ""}
                 </span>
               )}
             </div>
-            <h2 className="text-base sm:text-xl font-bold text-white drop-shadow-md">
+            <h2 className="text-sm sm:text-xl font-bold text-white drop-shadow-md truncate">
               {currentTrack?.suratNamaLatin ? `QS. ${currentTrack.suratNamaLatin}` : currentTrack?.title}
             </h2>
           </div>
         </div>
 
         {/* Header Action Tools */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Soundscape Mixer Button */}
           <button
             onClick={() => setActivePanel(activePanel === "soundscape" ? null : "soundscape")}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-2 ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 ${
               activeSoundCount > 0 || activePanel === "soundscape"
                 ? "bg-emerald-600/90 text-white border-emerald-400 shadow-lg shadow-emerald-950/40"
                 : "bg-white/10 text-stone-200 hover:bg-white/20 border-white/15"
@@ -339,7 +339,7 @@ export default function AnimatedZenPlayer({
             )}
             <span className="hidden sm:inline">Suara Alam</span>
             {activeSoundCount > 0 && (
-              <span className="w-5 h-5 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-bold flex items-center justify-center">
+              <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-bold flex items-center justify-center">
                 {activeSoundCount}
               </span>
             )}
@@ -348,7 +348,7 @@ export default function AnimatedZenPlayer({
           {/* Background Selector Button */}
           <button
             onClick={() => setActivePanel(activePanel === "background" ? null : "background")}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 ${
               activePanel === "background"
                 ? "bg-white/30 text-white border-white/40"
                 : "bg-white/10 text-stone-200 hover:bg-white/20 border-white/15"
@@ -356,7 +356,7 @@ export default function AnimatedZenPlayer({
             title="Ganti Background Image"
           >
             <ImageIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Latar Belakang</span>
+            <span className="hidden sm:inline">Latar</span>
           </button>
 
           {/* Settings Panel Button */}
@@ -372,10 +372,10 @@ export default function AnimatedZenPlayer({
             <Settings className="w-4 h-4" />
           </button>
 
-          {/* Fullscreen Button */}
+          {/* Fullscreen Button - only on sm+ */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-stone-200 backdrop-blur-md border border-white/15 transition-all"
+            className="hidden sm:flex p-2 rounded-xl bg-white/10 hover:bg-white/20 text-stone-200 backdrop-blur-md border border-white/15 transition-all"
             title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh (Fullscreen)"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -395,7 +395,7 @@ export default function AnimatedZenPlayer({
       {/* 3. Dropdown Floating Modals / Tool Panels */}
       {/* 3A. Soundscape Mixer Panel */}
       {activePanel === "soundscape" && (
-        <div className="absolute top-20 right-4 sm:right-8 z-30 w-80 sm:w-96 bg-stone-900/90 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-5 shadow-2xl text-stone-100 animate-fade-in-up">
+        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-96 mx-auto sm:mx-0 bg-stone-900/95 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[70vh] overflow-y-auto animate-fade-in-up">
           <div className="flex items-center justify-between pb-3 border-b border-stone-800">
             <div className="flex items-center gap-2">
               <Wind className="w-4 h-4 text-emerald-400" />
@@ -505,7 +505,7 @@ export default function AnimatedZenPlayer({
 
       {/* 3B. Background Selector Panel */}
       {activePanel === "background" && (
-        <div className="absolute top-20 right-4 sm:right-8 z-30 w-80 sm:w-96 bg-stone-900/90 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-5 shadow-2xl text-stone-100 animate-fade-in-up">
+        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-96 mx-auto sm:mx-0 bg-stone-900/95 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[70vh] overflow-y-auto animate-fade-in-up">
           <div className="flex items-center justify-between pb-3 border-b border-stone-800">
             <div className="flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-emerald-400" />
@@ -579,7 +579,7 @@ export default function AnimatedZenPlayer({
 
       {/* 3C. Settings Panel (Typography & Overlay) */}
       {activePanel === "settings" && (
-        <div className="absolute top-20 right-4 sm:right-8 z-30 w-80 bg-stone-900/90 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-5 shadow-2xl text-stone-100 animate-fade-in-up space-y-4">
+        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-80 mx-auto sm:mx-0 bg-stone-900/95 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[70vh] overflow-y-auto animate-fade-in-up space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-stone-800">
             <div className="flex items-center gap-2">
               <Settings className="w-4 h-4 text-emerald-400" />
@@ -712,11 +712,11 @@ export default function AnimatedZenPlayer({
       </main>
 
       {/* 5. Bottom Cinematic Player Controls Bar */}
-      <footer className="relative z-20 px-4 sm:px-8 pb-6 sm:pb-8 pt-4 bg-gradient-to-t from-black/95 via-black/75 to-transparent backdrop-blur-xs">
-        <div className="max-w-2xl mx-auto space-y-3">
+      <footer className="relative z-20 px-3 sm:px-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-8 pt-3 sm:pt-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-xs">
+        <div className="max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
           {/* Scrubber Timeline */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-stone-400 w-10 text-right font-medium">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-[11px] sm:text-xs text-stone-400 w-9 text-right font-medium">
               {formatTime(currentTime)}
             </span>
             <input
@@ -727,20 +727,20 @@ export default function AnimatedZenPlayer({
               onChange={handleSeek}
               className="flex-1 h-1.5 bg-stone-700/80 rounded-lg appearance-none cursor-pointer accent-emerald-400"
             />
-            <span className="text-xs text-stone-400 w-10 font-medium">
+            <span className="text-[11px] sm:text-xs text-stone-400 w-9 font-medium">
               {formatTime(duration)}
             </span>
           </div>
 
           {/* Playback Controls & Info */}
-          <div className="flex items-center justify-between">
-            {/* Left: Reciter and Surah Info */}
-            <div className="flex items-center gap-2 truncate max-w-[140px] sm:max-w-[200px]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4 pt-0.5">
+            {/* Top row in mobile: Reciter selector and Soundscape summary */}
+            <div className="flex items-center justify-between w-full sm:w-auto gap-2">
               {setReciterKey && (
                 <select
                   value={reciterKey || "05"}
                   onChange={(e) => setReciterKey(e.target.value)}
-                  className="text-xs bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-2.5 py-1.5 text-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400 truncate cursor-pointer"
+                  className="text-xs bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-2.5 py-1.5 text-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400 max-w-[150px] sm:max-w-[180px] truncate cursor-pointer"
                 >
                   {Object.entries(RECITERS).map(([key, val]) => (
                     <option key={key} value={key} className="bg-stone-900 text-white">
@@ -749,10 +749,22 @@ export default function AnimatedZenPlayer({
                   ))}
                 </select>
               )}
+
+              {/* Mobile Ambient Sound Quick Indicator */}
+              <button
+                onClick={() => setActivePanel(activePanel === "soundscape" ? null : "soundscape")}
+                className="text-stone-300 hover:text-white flex items-center gap-1.5 text-xs bg-white/10 sm:bg-transparent px-2.5 py-1 sm:p-0 rounded-lg sm:rounded-none border sm:border-0 border-white/15"
+                title="Buka Mixer Suara Alam"
+              >
+                <Wind className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px]">
+                  {activeSoundCount > 0 ? `${activeSoundCount} Suara Alam` : "Suara Alam"}
+                </span>
+              </button>
             </div>
 
-            {/* Center: Main Playback Controls */}
-            <div className="flex items-center gap-4 sm:gap-6">
+            {/* Main Playback Controls: Always centered and uncluttered */}
+            <div className="flex items-center gap-4 sm:gap-6 justify-center">
               {/* Loop Repeat Button */}
               {setRepeatCount && (
                 <button
@@ -762,7 +774,7 @@ export default function AnimatedZenPlayer({
                     const next = nextCycles[(currentIdx + 1) % nextCycles.length];
                     setRepeatCount(next);
                   }}
-                  className={`p-2 rounded-full border transition-all ${
+                  className={`p-2.5 sm:p-2 rounded-full border transition-all ${
                     repeatCount > 1
                       ? "bg-emerald-600 border-emerald-400 text-white shadow-md"
                       : "bg-white/10 hover:bg-white/20 border-white/15 text-stone-300"
@@ -777,43 +789,29 @@ export default function AnimatedZenPlayer({
               <button
                 onClick={handlePrevTrack}
                 disabled={!hasPrev}
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-stone-200 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-all shadow-md"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-stone-200 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-all shadow-md active:scale-95"
                 title="Ayat Sebelumnya"
               >
-                <SkipBack className="w-4 h-4" />
+                <SkipBack className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
               {/* Big Play/Pause Button */}
               <button
                 onClick={togglePlay}
-                className="w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-400 hover:from-emerald-500 hover:to-emerald-300 text-white flex items-center justify-center shadow-xl shadow-emerald-950/60 transition-transform hover:scale-105 active:scale-95"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-400 hover:from-emerald-500 hover:to-emerald-300 text-white flex items-center justify-center shadow-xl shadow-emerald-950/60 transition-transform hover:scale-105 active:scale-95"
                 title={isPlaying ? "Jeda Audio" : "Putar Audio"}
               >
-                {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 ml-0.5 fill-current" />}
+                {isPlaying ? <Pause className="w-6 h-6 sm:w-7 sm:h-7 fill-current" /> : <Play className="w-6 h-6 sm:w-7 sm:h-7 ml-0.5 fill-current" />}
               </button>
 
               {/* Next Button */}
               <button
                 onClick={handleNextTrack}
                 disabled={!hasNext}
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-stone-200 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-all shadow-md"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-stone-200 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-all shadow-md active:scale-95"
                 title="Ayat Selanjutnya"
               >
-                <SkipForward className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Right: Ambient Sound Quick Indicator */}
-            <div className="flex items-center gap-1.5 text-right">
-              <button
-                onClick={() => setActivePanel(activePanel === "soundscape" ? null : "soundscape")}
-                className="text-stone-400 hover:text-white flex items-center gap-1 text-xs"
-                title="Buka Mixer Suara Alam"
-              >
-                <Wind className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline text-[11px]">
-                  {activeSoundCount > 0 ? `${activeSoundCount} Suara Alam` : "Suara Alam"}
-                </span>
+                <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>

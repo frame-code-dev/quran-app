@@ -186,7 +186,7 @@ export default function MemorizeMode({
             <div
               key={ayat.nomorAyat}
               id={`ayat-${ayat.nomorAyat}`}
-              className={`bg-white rounded-2xl border transition-all duration-200 p-4 sm:p-5 ${
+              className={`bg-white rounded-2xl border transition-all duration-200 p-3.5 sm:p-5 ${
                 currentStatus === "mutqin"
                   ? "border-emerald-300 bg-emerald-50/20"
                   : currentStatus === "proses"
@@ -197,17 +197,17 @@ export default function MemorizeMode({
               {/* Header: Ayat Number & Status Selector */}
               <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-stone-100">
                 <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-xs border border-stone-200/50">
+                  <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-xs border border-stone-200/50">
                     {ayat.nomorAyat}
                   </span>
-                  <span className="text-xs text-stone-500">Ayat ke-{ayat.nomorAyat}</span>
+                  <span className="text-xs text-stone-500">Ayat {ayat.nomorAyat}</span>
                 </div>
 
                 {/* Status Toggle Buttons */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => setAyatStatus(ayat.nomorAyat, "belum")}
-                    className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
+                    className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors ${
                       currentStatus === "belum"
                         ? "bg-stone-200 text-stone-800 font-bold border-stone-300"
                         : "text-stone-400 border-stone-200 hover:bg-stone-50"
@@ -217,7 +217,7 @@ export default function MemorizeMode({
                   </button>
                   <button
                     onClick={() => setAyatStatus(ayat.nomorAyat, "proses")}
-                    className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
+                    className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors ${
                       currentStatus === "proses"
                         ? "bg-amber-100 text-amber-800 font-bold border-amber-300"
                         : "text-stone-400 border-stone-200 hover:bg-stone-50"
@@ -227,7 +227,7 @@ export default function MemorizeMode({
                   </button>
                   <button
                     onClick={() => setAyatStatus(ayat.nomorAyat, "mutqin")}
-                    className={`text-[11px] px-2 py-1 rounded-lg border transition-colors flex items-center gap-1 ${
+                    className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
                       currentStatus === "mutqin"
                         ? "bg-emerald-100 text-emerald-800 font-bold border-emerald-300"
                         : "text-stone-400 border-stone-200 hover:bg-stone-50"

@@ -483,8 +483,8 @@ export default function AudioPlayerBar({
       <div
         className={`fixed z-50 transition-all duration-300 pointer-events-none ${
           isMinimized
-            ? "bottom-16 sm:bottom-6 right-3 sm:right-6 left-auto max-w-sm w-auto"
-            : "bottom-16 sm:bottom-4 left-0 right-0 px-3 sm:px-6"
+            ? "bottom-[68px] sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-sm sm:w-auto"
+            : "bottom-[68px] sm:bottom-4 left-0 right-0 px-2 sm:px-6"
         }`}
       >
         <audio
@@ -505,8 +505,12 @@ export default function AudioPlayerBar({
 
         {/* Minimized View (Compact Floating Island / Pill) */}
         {isMinimized ? (
-          <div className="flex items-center justify-between gap-3 bg-stone-900/95 text-stone-100 backdrop-blur-xl rounded-2xl p-2.5 sm:p-3 shadow-2xl border border-stone-800 pointer-events-auto transition-all">
-            <div className="flex items-center gap-2.5 truncate">
+          <div className="flex items-center justify-between gap-2.5 bg-stone-900/95 text-stone-100 backdrop-blur-xl rounded-2xl p-2.5 sm:p-3 shadow-2xl border border-stone-800 pointer-events-auto transition-all w-full sm:w-auto">
+            <div
+              onClick={() => setIsMinimized(false)}
+              className="flex items-center gap-2 sm:gap-2.5 truncate cursor-pointer flex-1 min-w-0"
+              title="Perbesar Player"
+            >
               <div className="w-8 h-8 rounded-xl bg-emerald-950 border border-emerald-800 flex items-center justify-center shrink-0">
                 {isPlaying ? (
                   <div className="flex items-center gap-0.5 h-3.5">
@@ -518,7 +522,7 @@ export default function AudioPlayerBar({
                   <Headphones className="w-4 h-4 text-emerald-400" />
                 )}
               </div>
-              <div className="truncate max-w-[120px] sm:max-w-[170px]">
+              <div className="truncate flex-1 min-w-0">
                 <span className="text-xs font-semibold text-white truncate block">
                   {currentTrack.title}
                 </span>
@@ -528,10 +532,10 @@ export default function AudioPlayerBar({
               </div>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               <button
                 onClick={togglePlay}
-                className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center text-xs hover:bg-emerald-600 transition-colors shadow-sm"
+                className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center text-xs hover:bg-emerald-600 active:scale-95 transition-all shadow-sm"
                 title={isPlaying ? "Jeda (Pause)" : "Putar (Play)"}
               >
                 {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
@@ -539,39 +543,27 @@ export default function AudioPlayerBar({
 
               <button
                 onClick={() => setIsZenOpen(true)}
-                className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-stone-800 transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-stone-800 transition-colors"
                 title="Buka Mode Animasi (Sinematik & Suara Alam)"
               >
-                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              </button>
-
-              <button
-                onClick={togglePictureInPicture}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  isPipActive
-                    ? "bg-emerald-800 text-white"
-                    : "text-stone-400 hover:text-white hover:bg-stone-800"
-                }`}
-                title="Picture-in-Picture (Layar Mengambang)"
-              >
-                <PictureInPicture2 className="w-3.5 h-3.5" />
+                <Sparkles className="w-4 h-4 animate-pulse" />
               </button>
 
               <button
                 onClick={() => setIsMinimized(false)}
-                className="text-stone-400 hover:text-white p-1.5 rounded-lg hover:bg-stone-800 transition-colors"
+                className="text-stone-400 hover:text-white p-1.5 sm:p-2 rounded-lg hover:bg-stone-800 transition-colors"
                 title="Perbesar Player"
               >
-                <Maximize2 className="w-3.5 h-3.5" />
+                <Maximize2 className="w-4 h-4" />
               </button>
 
               {onClose && (
                 <button
                   onClick={handleClose}
-                  className="text-stone-400 hover:text-white p-1.5 rounded-lg hover:bg-stone-800 transition-colors"
+                  className="text-stone-400 hover:text-white p-1.5 sm:p-2 rounded-lg hover:bg-stone-800 transition-colors"
                   title="Tutup Player"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -579,9 +571,10 @@ export default function AudioPlayerBar({
         ) : (
           /* Full Player View */
           <div className="max-w-2xl mx-auto bg-stone-900/95 text-stone-100 backdrop-blur-xl rounded-2xl p-3 sm:p-4 shadow-2xl border border-stone-800 pointer-events-auto transition-all duration-300">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="truncate flex-1">
-                <div className="flex items-center gap-2">
+            {/* Top Row: Track info & Action buttons */}
+            <div className="flex items-start sm:items-center justify-between gap-2 mb-2">
+              <div className="truncate flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-emerald-300 text-[10px] font-semibold uppercase tracking-wider bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60 flex items-center gap-1">
                     <Headphones className="w-3 h-3" />
                     Murattal
@@ -598,16 +591,17 @@ export default function AudioPlayerBar({
                     </span>
                   )}
                 </div>
-                <h4 className="text-sm font-bold text-white truncate mt-1">{currentTrack.title}</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-white truncate mt-1">{currentTrack.title}</h4>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                {/* Qari selector */}
+              {/* Action buttons on the right */}
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Qari selector (desktop only in header) */}
                 {setReciterKey && (
                   <select
                     value={reciterKey || "05"}
                     onChange={(e) => setReciterKey(e.target.value)}
-                    className="text-xs bg-stone-800 border border-stone-700 rounded-lg px-2 py-1 text-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-600 max-w-[130px] truncate"
+                    className="hidden sm:block text-xs bg-stone-800 border border-stone-700 rounded-lg px-2 py-1 text-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-600 max-w-[130px] truncate"
                   >
                     {Object.entries(RECITERS).map(([key, val]) => (
                       <option key={key} value={key}>
@@ -620,17 +614,17 @@ export default function AudioPlayerBar({
                 {/* Animated Zen Mode Button */}
                 <button
                   onClick={() => setIsZenOpen(true)}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-900/80 hover:bg-emerald-800 text-emerald-300 hover:text-white border border-emerald-700/60 flex items-center gap-1.5 text-xs font-semibold transition-colors shadow-xs"
+                  className="px-2 py-1 rounded-lg bg-emerald-900/80 hover:bg-emerald-800 text-emerald-300 hover:text-white border border-emerald-700/60 flex items-center gap-1 text-xs font-semibold transition-colors shadow-xs"
                   title="Buka Mode Animasi Sinematik & Suara Alam (Hujan, Angin, dll)"
                 >
-                  <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                   <span className="hidden sm:inline">Animasi</span>
                 </button>
 
                 {/* Picture-in-Picture Button */}
                 <button
                   onClick={togglePictureInPicture}
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-colors ${
                     isPipActive
                       ? "bg-emerald-800 text-white"
                       : "hover:bg-stone-800 text-stone-400 hover:text-white"
@@ -647,7 +641,7 @@ export default function AudioPlayerBar({
                 {/* Minimize Button */}
                 <button
                   onClick={() => setIsMinimized(true)}
-                  className="w-7 h-7 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
                   title="Kecilkan Player (Minimize)"
                 >
                   <Minimize2 className="w-3.5 h-3.5" />
@@ -656,7 +650,7 @@ export default function AudioPlayerBar({
                 {onClose && (
                   <button
                     onClick={handleClose}
-                    className="w-7 h-7 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
                     title="Tutup Player"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -682,9 +676,9 @@ export default function AudioPlayerBar({
             </div>
 
             {/* Playback Controls */}
-            <div className="flex items-center justify-between pt-1">
-              {/* Loop Repeat Button */}
-              <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between pt-1 gap-1">
+              {/* Loop Repeat Button & Mobile Qari Selector */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 {setRepeatCount && (
                   <button
                     onClick={() => {
@@ -707,10 +701,25 @@ export default function AudioPlayerBar({
                     </span>
                   </button>
                 )}
+
+                {/* Mobile Qari Selector */}
+                {setReciterKey && (
+                  <select
+                    value={reciterKey || "05"}
+                    onChange={(e) => setReciterKey(e.target.value)}
+                    className="sm:hidden text-[10px] bg-stone-800 border border-stone-700 rounded-lg px-1.5 py-1 text-stone-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 max-w-[105px] truncate"
+                  >
+                    {Object.entries(RECITERS).map(([key, val]) => (
+                      <option key={key} value={key}>
+                        {val.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Main controls (Prev, Play, Next) */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={handlePrevTrack}
                   disabled={!hasPrev}
@@ -721,7 +730,7 @@ export default function AudioPlayerBar({
                 </button>
                 <button
                   onClick={togglePlay}
-                  className="w-10 h-10 rounded-full bg-emerald-700 text-white hover:bg-emerald-600 flex items-center justify-center text-base shadow-lg transition-transform hover:scale-105"
+                  className="w-10 h-10 rounded-full bg-emerald-700 text-white hover:bg-emerald-600 active:scale-95 flex items-center justify-center text-base shadow-lg transition-transform"
                   title={isPlaying ? "Jeda (Pause)" : "Putar (Play)"}
                 >
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
@@ -736,9 +745,9 @@ export default function AudioPlayerBar({
                 </button>
               </div>
 
-              <div className="w-16 text-right">
+              <div className="min-w-[50px] text-right shrink-0">
                 <span className="text-[11px] text-stone-400">
-                  {currentTrack.ayatNomor ? `Ayat ${currentTrack.ayatNomor}` : "Full Surat"}
+                  {currentTrack.ayatNomor ? `Ayat ${currentTrack.ayatNomor}` : "Full"}
                 </span>
               </div>
             </div>

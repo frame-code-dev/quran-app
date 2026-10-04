@@ -79,7 +79,7 @@ export default function Navbar({ isMobileFrame, setIsMobileFrame, searchQuery, s
           {setIsMobileFrame && (
             <button
               onClick={() => setIsMobileFrame(!isMobileFrame)}
-              className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all ${
+              className={`hidden sm:flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all ${
                 isMobileFrame
                   ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
                   : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
