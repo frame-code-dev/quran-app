@@ -8,6 +8,7 @@ import BottomNav from "./BottomNav";
 import SuratCard from "./SuratCard";
 import AudioPlayerBar from "./AudioPlayerBar";
 import ReflectionModal from "./ReflectionModal";
+import Footer from "./Footer";
 import { getDailyVerse, getRandomVerse } from "@/utils/dailyVerse";
 
 export default function HomeClientView({ initialSuratList = [] }) {
@@ -393,6 +394,9 @@ export default function HomeClientView({ initialSuratList = [] }) {
             </button>
           </div>
         )}
+
+        {/* Footer: Pengenalan Dev, API Attribution & Buy Me a Coffee */}
+        <Footer />
       </main>
 
       {/* Floating Sticky Audio Player Bar */}

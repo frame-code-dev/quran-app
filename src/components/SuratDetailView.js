@@ -20,6 +20,7 @@ import BottomNav from "./BottomNav";
 import AudioPlayerBar, { RECITERS } from "./AudioPlayerBar";
 import MemorizeMode from "./MemorizeMode";
 import ReflectionModal from "./ReflectionModal";
+import Footer from "./Footer";
 import { useRouter, useSearchParams } from "next/navigation";
 import ambientEngine from "@/utils/ambientSound";
 
@@ -830,6 +831,9 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
             </div>
           </div>
         )}
+
+        {/* Footer: Pengenalan Dev, API Attribution & Buy Me a Coffee */}
+        <Footer />
       </main>
 
       {/* Floating Sticky Audio Player Bar */}
