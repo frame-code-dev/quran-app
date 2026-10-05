@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X, Shuffle } from "lucide-react";
+import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X, Shuffle, Share2, Smartphone } from "lucide-react";
 import Navbar from "./Navbar";
 import BottomNav from "./BottomNav";
 import SuratCard from "./SuratCard";
 import AudioPlayerBar from "./AudioPlayerBar";
 import ReflectionModal from "./ReflectionModal";
+import VerseStoryModal from "./VerseStoryModal";
 import Footer from "./Footer";
 import { getDailyVerse, getRandomVerse } from "@/utils/dailyVerse";
 
@@ -30,6 +31,7 @@ export default function HomeClientView({ initialSuratList = [] }) {
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
   const [transferredPlaylist, setTransferredPlaylist] = useState(null);
   const [transferredIndex, setTransferredIndex] = useState(null);
+  const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 
   useEffect(() => {
     // Sync with today's verse on client mount (handles local timezone accurately)
@@ -270,47 +272,90 @@ export default function HomeClientView({ initialSuratList = [] }) {
           </div>
         </div>
 
-        {/* Daily Verse / Tadabbur Spotlight Card */}
-        <div className="bg-[#F0F7F4] border border-[#A3CFBB]/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-          <div className="space-y-1.5 max-w-xl">
+        {/* Daily Verse / Tadabbur Spotlight Card - Ultra Estetik */}
+        <div className="relative overflow-hidden rounded-3xl p-5 sm:p-7 bg-gradient-to-br from-[#FAFBF9] via-[#F4F9F6] to-[#EAF4EE] border border-[#B38F5C]/35 shadow-sm hover:shadow-md transition-all duration-300">
+          {/* Subtle Ambient Decorative Glows */}
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 rounded-full bg-emerald-200/35 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-amber-100/40 blur-2xl pointer-events-none" />
+
+          {/* Top Bar: Badges & Story Quick Action */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-emerald-900/10">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-emerald-900 bg-white border border-[#A3CFBB]/60 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
-                <Sparkles className="w-3 h-3 text-emerald-800" />
+              <span className="text-xs font-bold text-emerald-950 bg-white/90 border border-emerald-700/20 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
                 <span>Ayat Hari Ini</span>
               </span>
-              <span className="text-xs text-stone-500 font-medium">
-                QS. {dailyVerse?.suratNamaLatin}: {dailyVerse?.nomorAyat}
+              <span className="text-xs font-semibold text-emerald-900 bg-emerald-900/10 px-3 py-1 rounded-full border border-emerald-900/15">
+                QS. {dailyVerse?.suratNamaLatin} : Ayat {dailyVerse?.nomorAyat}
               </span>
             </div>
-            <p className="font-arabic text-xl sm:text-2xl text-emerald-950 font-bold leading-relaxed pt-1">
+
+            {/* Quick Story WA Pill Trigger */}
+            <button
+              onClick={() => setIsStoryModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-emerald-700 to-[#128C7E] hover:from-emerald-800 hover:to-[#0E7064] shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+              title="Buat Story WhatsApp / Instagram"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Story WA</span>
+            </button>
+          </div>
+
+          {/* Arabic Verse & Translations */}
+          <div className="relative z-10 py-3 sm:py-4 space-y-3">
+            {/* Basmalah accent */}
+            <p className="font-arabic text-sm text-[#B38F5C] opacity-80 text-right pr-1">
+              بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ
+            </p>
+
+            {/* Main Arabic Verse */}
+            <p className="font-arabic text-2xl sm:text-3xl text-emerald-950 font-bold leading-[2.3] sm:leading-[2.5] text-right selection:bg-emerald-200">
               {dailyVerse?.teksArab}
             </p>
+
+            {/* Latin Transliteration */}
             {dailyVerse?.teksLatin && (
-              <p className="text-xs text-emerald-900/80 italic font-medium">
+              <p className="text-xs sm:text-sm text-emerald-900/80 italic font-medium leading-relaxed">
                 {dailyVerse?.teksLatin}
               </p>
             )}
-            <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
-              &quot;{dailyVerse?.teksIndonesia}&quot;
-            </p>
+
+            {/* Indonesian Translation with elegant quote accent */}
+            <div className="relative pl-3.5 border-l-2 border-[#B38F5C]/60 pt-0.5">
+              <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-normal">
+                &quot;{dailyVerse?.teksIndonesia}&quot;
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-            <button
-              onClick={handleShuffleDailyVerse}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white hover:bg-stone-50 text-stone-700 hover:text-emerald-900 border border-stone-200 text-xs font-semibold shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              title="Ganti ke Ayat Renungan Lainnya"
-            >
-              <Shuffle className="w-3.5 h-3.5 text-emerald-700" />
-              <span className="text-xs sm:inline">Acak Ayat</span>
-            </button>
+          {/* Bottom Action Bar */}
+          <div className="relative z-10 pt-3 border-t border-emerald-900/10 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShuffleDailyVerse}
+                className="px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 text-stone-700 hover:text-emerald-950 border border-stone-200/90 text-xs font-semibold shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Ganti ke Ayat Renungan Lainnya"
+              >
+                <Shuffle className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Acak Ayat</span>
+              </button>
 
+              <button
+                onClick={handleOpenDailyReflection}
+                className="px-3.5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Tadabbur Sekarang</span>
+              </button>
+            </div>
+
+            {/* Main Button: Story WhatsApp */}
             <button
-              onClick={handleOpenDailyReflection}
-              className="flex-1 sm:flex-none whitespace-nowrap px-4 py-2.5 sm:py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              onClick={() => setIsStoryModalOpen(true)}
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366] text-[#0f6b33] hover:text-white border border-[#25D366]/35 text-xs font-bold shadow-2xs hover:shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Tadabbur Sekarang</span>
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Bagikan ke Story WA</span>
             </button>
           </div>
         </div>
@@ -439,6 +484,13 @@ export default function HomeClientView({ initialSuratList = [] }) {
         isOpen={isReflectionOpen}
         onClose={() => setIsReflectionOpen(false)}
         ayatData={reflectionAyat}
+      />
+
+      {/* WhatsApp & Instagram Story Generator Modal */}
+      <VerseStoryModal
+        isOpen={isStoryModalOpen}
+        onClose={() => setIsStoryModalOpen(false)}
+        verseData={dailyVerse}
       />
 
       {/* Bottom Nav on Mobile */}
