@@ -125,3 +125,23 @@ body {
 .quran-text-glow {
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
 }
+
+/* Animasi Fokus Glow saat Lompat ke Ayat (Pencarian / Bookmark) */
+@keyframes ayatGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.6);
+    background-color: #FEF3C7;
+  }
+  60% {
+    box-shadow: 0 0 0 8px rgba(217, 119, 6, 0);
+    background-color: #FEF3C7;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+  }
+}
+
+.ayat-jump-highlight {
+  animation: ayatGlow 2.5s ease-out forwards;
+  border-color: #D97706 !important;
+}

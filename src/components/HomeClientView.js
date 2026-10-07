@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X, Shuffle, Share2, Smartphone } from "lucide-react";
+import { BookOpen, Headphones, Brain, Sparkles, Bookmark, Search, X, Shuffle, Share2, Smartphone, Compass, ArrowUpRight } from "lucide-react";
 import Navbar from "./Navbar";
 import BottomNav from "./BottomNav";
 import SuratCard from "./SuratCard";
@@ -11,6 +11,7 @@ import ReflectionModal from "./ReflectionModal";
 import VerseStoryModal from "./VerseStoryModal";
 import Footer from "./Footer";
 import { getDailyVerse, getRandomVerse } from "@/utils/dailyVerse";
+import { executeLocalSmartSearch } from "@/utils/quranSearch";
 
 export default function HomeClientView({ initialSuratList = [] }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,13 +62,32 @@ export default function HomeClientView({ initialSuratList = [] }) {
     }
   }, []);
 
+  const smartResults = useMemo(() => executeLocalSmartSearch(searchQuery), [searchQuery]);
+
   // Filter surah list based on search and category
   const filteredSurat = useMemo(() => {
     return initialSuratList.filter((s) => {
-      // Search match
       const query = searchQuery.trim().toLowerCase();
+      if (!query) {
+        // Category match
+        if (category === "juz_amma") return s.nomor >= 78 && s.nomor <= 114;
+        if (category === "makkiyyah") return s.tempatTurun.toLowerCase() === "mekah";
+        if (category === "madaniyyah") return s.tempatTurun.toLowerCase() === "madinah";
+        return true;
+      }
+
+      // 1. Cocokkan jika ada pola surat & ayat (contoh: "nisa 136")
+      if (smartResults.patternResult && smartResults.patternResult.suratNomor === s.nomor) {
+        return true;
+      }
+
+      // 2. Cocokkan jika ada topik tematik (contoh: "100 dinar", "hutang", "jodoh")
+      if (smartResults.thematicResults.some((t) => t.suratNomor === s.nomor)) {
+        return true;
+      }
+
+      // 3. Pencarian nama / nomor reguler
       const matchSearch =
-        !query ||
         s.namaLatin.toLowerCase().includes(query) ||
         s.arti.toLowerCase().includes(query) ||
         s.nomor.toString() === query ||
@@ -82,7 +102,7 @@ export default function HomeClientView({ initialSuratList = [] }) {
 
       return true;
     });
-  }, [initialSuratList, searchQuery, category]);
+  }, [initialSuratList, searchQuery, category, smartResults]);
 
   const handleOpenDailyReflection = () => {
     setReflectionAyat(dailyVerse);
@@ -366,7 +386,7 @@ export default function HomeClientView({ initialSuratList = [] }) {
           <div className="relative md:hidden">
             <input
               type="text"
-              placeholder="Cari surat (contoh: Yasin, Al-Mulk, 36)..."
+              placeholder="Cari surat / ayat (contoh: nisa 136, 100 dinar, hutang, jodoh)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full text-sm pl-9 pr-8 py-2.5 rounded-xl bg-white border border-stone-200 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 shadow-xs"
@@ -410,6 +430,69 @@ export default function HomeClientView({ initialSuratList = [] }) {
             </span>
           </div>
         </div>
+
+        {/* Smart Match Banner (jika pola surat:ayat atau topik tematik cocok) */}
+        {searchQuery.trim().length > 0 && (smartResults.patternResult || smartResults.thematicResults.length > 0) && (
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-amber-50/70 border border-emerald-200/90 shadow-2xs space-y-2.5 animate-fade-in-up">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+              <Sparkles className="w-4 h-4 text-emerald-700" />
+              <span>Rekomendasi Cerdas Al-Qur&apos;an:</span>
+            </div>
+
+            {/* Pattern result (contoh: "nisa 136") */}
+            {smartResults.patternResult && (
+              <div className="bg-white p-3 rounded-xl border border-emerald-300/80 shadow-2xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    {smartResults.patternResult.nomorAyat}
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-stone-900">
+                      {smartResults.patternResult.label}
+                    </h4>
+                    <p className="text-[11px] text-stone-500">
+                      Lompat langsung ke Surat {smartResults.patternResult.suratNamaLatin} ayat ke-{smartResults.patternResult.nomorAyat}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href={`/surat/${smartResults.patternResult.suratNomor}?ayat=${smartResults.patternResult.nomorAyat}#ayat-${smartResults.patternResult.nomorAyat}`}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1"
+                >
+                  <span>Buka Ayat</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+
+            {/* Thematic result (contoh: "100 dinar", "hutang", "jodoh") */}
+            {smartResults.thematicResults.map((t) => (
+              <div
+                key={t.id}
+                className="bg-white p-3 rounded-xl border border-amber-200/80 shadow-2xs flex items-start justify-between gap-3"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-stone-900">{t.title}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-semibold border border-amber-200">
+                      QS. {t.suratNamaLatin} : {t.ayatRange}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-600 mt-1 line-clamp-2 leading-relaxed">
+                    {t.description}
+                  </p>
+                </div>
+                <Link
+                  href={`/surat/${t.suratNomor}?ayat=${t.nomorAyat}#ayat-${t.nomorAyat}`}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-2xs shrink-0 flex items-center gap-1"
+                >
+                  <span>Buka</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Surah Cards Grid */}
         {filteredSurat.length > 0 ? (
