@@ -2,13 +2,14 @@ import "./globals.css";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 
 export const metadata = {
-  title: "Qur'an App - Read, Listen, Memorize, Reflect",
-  description: "Aplikasi Al-Qur'an digital modern, minimalis, dan ramah pengguna dengan 4 pilar utama: Read, Listen, Memorize, dan Reflect.",
+  title: "Al-Qur'an Al-Karim — Tilawah, Tafsir & Muraja'ah",
+  description:
+    "Ruang baca Al-Qur'an digital yang tenang dan nyaman dengan teks Arab standar Kemenag RI, terjemahan, murattal 5 qari, mode mushaf fokus, hafalan muraja'ah, dan catatan tadabbur pribadi.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Qur'an App",
+    title: "Al-Qur'an",
   },
   icons: {
     icon: [
@@ -24,15 +25,32 @@ export const metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#059669",
+  themeColor: "#1B4332",
 };
+
+const themeInitScript = `
+(function() {
+  try {
+    var saved = localStorage.getItem('quran_reading_theme');
+    var meta = document.querySelector('meta[name="color-scheme"]');
+    if (saved === 'dark' || saved === 'light' || saved === 'mushaf') {
+      document.documentElement.dataset.theme = saved;
+      if (meta) meta.setAttribute('content', saved === 'dark' ? 'dark' : 'light');
+    } else if (meta) {
+      meta.setAttribute('content', 'light dark');
+    }
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id" className="scroll-smooth">
-      <body className="bg-stone-50 text-slate-800 antialiased min-h-screen selection:bg-emerald-100 selection:text-emerald-900">
+    <html lang="id" className="scroll-smooth" suppressHydrationWarning>
+      <head>
+        <meta name="color-scheme" content="light dark" />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="antialiased min-h-screen selection:bg-emerald-800/15 selection:text-emerald-950">
         <PWAInstallBanner />
         {children}
       </body>
