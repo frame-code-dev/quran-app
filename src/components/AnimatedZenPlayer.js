@@ -12,51 +12,43 @@ import {
   Maximize2,
   Minimize2,
   X,
-  Sliders,
   Image as ImageIcon,
   CloudRain,
   Wind,
   Waves,
   Moon,
-  Sparkles,
   Settings,
 } from "lucide-react";
 import ambientEngine from "@/utils/ambientSound";
 import { RECITERS } from "./AudioPlayerBar";
+import { formatAyatMarker } from "@/utils/quranStorage";
 
-// Default Preset Backgrounds
 const BACKGROUND_PRESETS = [
   {
     id: "rain",
     name: "Hujan Tenang",
-    subtitle: "Rintik hujan di jendela",
+    subtitle: "Rintik hujan di balik jendela",
     url: "/backgrounds/rain.png",
-    recommendedSound: "rain",
-    color: "#0F2027",
   },
   {
     id: "wind",
-    name: "Semilir Angin Hutan",
-    subtitle: "Hutan pinus berkabut",
+    name: "Hutan Berkabut",
+    subtitle: "Semilir angin pepohonan",
     url: "/backgrounds/wind.png",
-    recommendedSound: "wind",
-    color: "#13271F",
   },
   {
     id: "night",
     name: "Malam Berbintang",
-    subtitle: "Gurun pasir & hilal",
+    subtitle: "Langit malam gurun yang sunyi",
     url: "/backgrounds/night.png",
-    recommendedSound: "night",
-    color: "#080c14",
   },
 ];
 
 const SOUND_PRESETS = [
-  { id: "rain", label: "Hujan (Rain)", icon: CloudRain, defaultVol: 0.5 },
-  { id: "wind", label: "Angin (Wind)", icon: Wind, defaultVol: 0.5 },
-  { id: "waves", label: "Ombak / Air (Waves)", icon: Waves, defaultVol: 0.4 },
-  { id: "night", label: "Malam & Jangkrik", icon: Moon, defaultVol: 0.35 },
+  { id: "rain", label: "Rintik Hujan", icon: CloudRain, defaultVol: 0.5 },
+  { id: "wind", label: "Semilir Angin", icon: Wind, defaultVol: 0.5 },
+  { id: "waves", label: "Aliran Air / Ombak", icon: Waves, defaultVol: 0.4 },
+  { id: "night", label: "Suasana Malam", icon: Moon, defaultVol: 0.35 },
 ];
 
 export default function AnimatedZenPlayer({
@@ -77,56 +69,45 @@ export default function AnimatedZenPlayer({
   setReciterKey,
   repeatCount,
   setRepeatCount,
-  currentLoop,
   transitioningToNext,
 }) {
   const [selectedBg, setSelectedBg] = useState(BACKGROUND_PRESETS[0].url);
-  const [customBgUrl, setCustomBgUrl] = useState("");
-  const [overlayDarkness, setOverlayDarkness] = useState(0.55); // 0.3 - 0.8
+  const [overlayDarkness, setOverlayDarkness] = useState(0.6);
   const [isKenBurnsActive, setIsKenBurnsActive] = useState(true);
 
-  // Soundscape State
-  const [activeSounds, setActiveSounds] = useState({}); // { rain: true, wind: false, ... }
+  const [activeSounds, setActiveSounds] = useState({});
   const [soundVolumes, setSoundVolumes] = useState({
     rain: 0.5,
     wind: 0.5,
     waves: 0.4,
     night: 0.35,
   });
-  const [masterAmbientVol, setMasterAmbientVol] = useState(0.6);
+  const [masterAmbientVol, setMasterAmbientVol] = useState(0.55);
   const [isAmbientMuted, setIsAmbientMuted] = useState(false);
 
-  // UI Panels
-  const [activePanel, setActivePanel] = useState(null); // null | 'soundscape' | 'background' | 'settings'
+  const [activePanel, setActivePanel] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showLatin, setShowLatin] = useState(true);
   const [showTranslation, setShowTranslation] = useState(true);
-  const [arabicSize, setArabicSize] = useState("large"); // 'normal' | 'large' | 'huge'
+  const [arabicSize, setArabicSize] = useState("large");
 
   const containerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Load preferences from localStorage
   useEffect(() => {
     try {
       const savedBg = localStorage.getItem("quran_zen_bg");
       if (savedBg) setSelectedBg(savedBg);
-
       const savedSounds = localStorage.getItem("quran_zen_sounds");
       if (savedSounds) setActiveSounds(JSON.parse(savedSounds));
-
       const savedVol = localStorage.getItem("quran_zen_vol");
       if (savedVol) setMasterAmbientVol(Number(savedVol));
-    } catch (e) {
-      // ignore
-    }
+    } catch {}
   }, []);
 
-  // Auto-resume active ambient sounds when open (e.g. after navigating between surahs)
   useEffect(() => {
     if (!isOpen || !ambientEngine) return;
     ambientEngine.init();
-
     Object.entries(activeSounds).forEach(([soundId, isActive]) => {
       if (isActive && !ambientEngine.activeNodes[soundId]) {
         const vol = soundVolumes[soundId] || 0.5;
@@ -138,7 +119,6 @@ export default function AnimatedZenPlayer({
     });
   }, [isOpen, activeSounds, soundVolumes]);
 
-  // Sync ambient sounds with ambientEngine
   const toggleAmbientSound = (soundId) => {
     if (!ambientEngine) return;
     const nextState = !activeSounds[soundId];
@@ -146,17 +126,17 @@ export default function AnimatedZenPlayer({
     setActiveSounds(updated);
 
     if (nextState) {
-      ambientEngine.startRain && soundId === "rain" && ambientEngine.startRain(soundVolumes.rain);
-      ambientEngine.startWind && soundId === "wind" && ambientEngine.startWind(soundVolumes.wind);
-      ambientEngine.startWaves && soundId === "waves" && ambientEngine.startWaves(soundVolumes.waves);
-      ambientEngine.startNight && soundId === "night" && ambientEngine.startNight(soundVolumes.night);
+      if (soundId === "rain") ambientEngine.startRain(soundVolumes.rain);
+      if (soundId === "wind") ambientEngine.startWind(soundVolumes.wind);
+      if (soundId === "waves") ambientEngine.startWaves(soundVolumes.waves);
+      if (soundId === "night") ambientEngine.startNight(soundVolumes.night);
     } else {
       ambientEngine.stopSound(soundId);
     }
 
     try {
       localStorage.setItem("quran_zen_sounds", JSON.stringify(updated));
-    } catch (e) {}
+    } catch {}
   };
 
   const handleSoundVolumeChange = (soundId, newVol) => {
@@ -168,48 +148,41 @@ export default function AnimatedZenPlayer({
 
   const handleMasterAmbientVolume = (vol) => {
     setMasterAmbientVol(vol);
-    if (ambientEngine) {
-      ambientEngine.setMasterVolume(vol);
-    }
+    if (ambientEngine) ambientEngine.setMasterVolume(vol);
     try {
       localStorage.setItem("quran_zen_vol", String(vol));
-    } catch (e) {}
+    } catch {}
   };
 
   const handleToggleAmbientMute = () => {
     if (ambientEngine) {
-      const muted = ambientEngine.toggleMute();
-      setIsAmbientMuted(muted);
+      setIsAmbientMuted(ambientEngine.toggleMute());
     }
   };
 
-  // Switch Background
   const handleSelectBg = (url) => {
     setSelectedBg(url);
     try {
       localStorage.setItem("quran_zen_bg", url);
-    } catch (e) {}
+    } catch {}
   };
 
-  // Upload Custom Background Image (e.g. image.png)
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          const resultUrl = event.target.result;
-          setSelectedBg(resultUrl);
+          setSelectedBg(event.target.result);
           try {
-            localStorage.setItem("quran_zen_bg", resultUrl);
-          } catch (e) {}
+            localStorage.setItem("quran_zen_bg", event.target.result);
+          } catch {}
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Fullscreen browser toggle
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => {});
@@ -220,16 +193,13 @@ export default function AnimatedZenPlayer({
     }
   }, []);
 
-  // Listen for escape key or fullscreen change
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape" && isOpen && !document.fullscreenElement) {
         onClose();
       }
     };
-    const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     window.addEventListener("keydown", handleKeyDown);
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => {
@@ -238,7 +208,6 @@ export default function AnimatedZenPlayer({
     };
   }, [isOpen, onClose]);
 
-  // Cleanup ambient sound when closing or unmounting
   const handleClose = () => {
     if (ambientEngine) {
       ambientEngine.stopAll();
@@ -255,17 +224,17 @@ export default function AnimatedZenPlayer({
   const activeSoundCount = Object.values(activeSounds).filter(Boolean).length;
 
   const getArabicSizeClass = () => {
-    if (arabicSize === "normal") return "text-2xl sm:text-3xl leading-[2.2]";
-    if (arabicSize === "huge") return "text-4xl sm:text-6xl leading-[2.4]";
-    return "text-3xl sm:text-5xl leading-[2.3]";
+    if (arabicSize === "normal") return "text-2xl sm:text-3xl leading-[2.3]";
+    if (arabicSize === "huge") return "text-4xl sm:text-6xl leading-[2.45]";
+    return "text-3xl sm:text-5xl leading-[2.4]";
   };
 
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 overflow-hidden flex flex-col justify-between bg-stone-950 text-white select-none transition-all duration-300"
+      className="fixed inset-0 z-50 overflow-hidden flex flex-col justify-between bg-[#0E1310] text-stone-100 select-none"
     >
-      {/* 1. Cinematic Background Layer with Ken Burns Pan/Zoom */}
+      {/* Background Layer */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 ${
@@ -273,156 +242,144 @@ export default function AnimatedZenPlayer({
           }`}
           style={{
             backgroundImage: `url(${selectedBg})`,
-            filter: "brightness(0.9) contrast(1.05)",
+            filter: "brightness(0.85) contrast(1.04)",
           }}
         />
-
-        {/* Ambient Dark Vignette & Gradient Overlays for optimal typography readability */}
         <div
-          className="absolute inset-0 transition-opacity duration-300 pointer-events-none"
-          style={{
-            backgroundColor: `rgba(10, 15, 20, ${overlayDarkness})`,
-          }}
+          className="absolute inset-0 transition-opacity duration-300"
+          style={{ backgroundColor: `rgba(10, 14, 12, ${overlayDarkness})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/70 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/50 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/70" />
       </div>
 
-      {/* Transition Banner between Surahs inside Zen Mode */}
       {transitioningToNext && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-emerald-950/95 text-white backdrop-blur-md px-5 py-2.5 rounded-2xl shadow-2xl border border-emerald-500/80 text-xs font-bold flex items-center gap-2.5 animate-pulse">
-          <Sparkles className="w-4 h-4 text-emerald-400" />
-          <span>Melanjutkan lantunan ke QS. {transitioningToNext}...</span>
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-[#161E1B]/95 text-stone-100 backdrop-blur-md px-4 py-2 rounded-xl border border-white/15 text-xs font-medium">
+          Melanjutkan lantunan ke QS. {transitioningToNext}...
         </div>
       )}
 
-      {/* 2. Top Navigation Bar */}
-      <header className="relative z-20 flex items-center justify-between px-3 sm:px-8 py-3 sm:py-6 gap-2">
-        {/* Surat & Ayah Badge */}
-        <div className="flex items-center gap-2 sm:gap-3 truncate min-w-0 pr-1">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-emerald-400 shadow-lg shrink-0">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
-          </div>
-          <div className="truncate min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Zen Mode
-              </span>
-              {currentTrack?.ayatNomor && (
-                <span className="text-[10px] sm:text-[11px] text-stone-300 font-medium truncate">
-                  Ayat {currentTrack.ayatNomor} {currentTrack.totalAyat ? `/ ${currentTrack.totalAyat}` : ""}
+      {/* Top Bar */}
+      <header className="relative z-20 flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6 gap-2">
+        <div className="truncate min-w-0">
+          <div className="flex items-center gap-2 text-[11px] text-stone-300">
+            <span className="uppercase tracking-widest font-medium text-[#D4B680]">
+              Ruang Khusyuk
+            </span>
+            {currentTrack?.ayatNomor && (
+              <>
+                <span>•</span>
+                <span>
+                  Ayat {currentTrack.ayatNomor}
+                  {currentTrack.totalAyat ? ` dari ${currentTrack.totalAyat}` : ""}
                 </span>
-              )}
-            </div>
-            <h2 className="text-sm sm:text-xl font-bold text-white drop-shadow-md truncate">
-              {currentTrack?.suratNamaLatin ? `QS. ${currentTrack.suratNamaLatin}` : currentTrack?.title}
-            </h2>
+              </>
+            )}
           </div>
+          <h2 className="font-editorial text-lg sm:text-2xl font-semibold text-white truncate mt-0.5">
+            {currentTrack?.suratNamaLatin ? `QS. ${currentTrack.suratNamaLatin}` : currentTrack?.title}
+          </h2>
         </div>
 
-        {/* Header Action Tools */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Soundscape Mixer Button */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
+            type="button"
             onClick={() => setActivePanel(activePanel === "soundscape" ? null : "soundscape")}
-            className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-medium backdrop-blur-md border transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeSoundCount > 0 || activePanel === "soundscape"
-                ? "bg-emerald-600/90 text-white border-emerald-400 shadow-lg shadow-emerald-950/40"
-                : "bg-white/10 text-stone-200 hover:bg-white/20 border-white/15"
+                ? "bg-[#2D6A4F] text-white border-emerald-500/50"
+                : "bg-white/10 text-stone-200 hover:bg-white/15 border-white/15"
             }`}
-            title="Pengaturan Suara Alam (Hujan, Angin, Ombak)"
+            title="Suara Alam"
           >
-            {activeSoundCount > 0 ? (
-              <Wind className="w-4 h-4 animate-spin" style={{ animationDuration: "6s" }} />
-            ) : (
-              <Wind className="w-4 h-4" />
-            )}
+            <Wind className="w-4 h-4" />
             <span className="hidden sm:inline">Suara Alam</span>
             {activeSoundCount > 0 && (
-              <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-bold flex items-center justify-center">
-                {activeSoundCount}
-              </span>
+              <span className="text-[10px] px-1.5 rounded-full bg-black/30">{activeSoundCount}</span>
             )}
           </button>
 
-          {/* Background Selector Button */}
           <button
+            type="button"
             onClick={() => setActivePanel(activePanel === "background" ? null : "background")}
-            className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-medium backdrop-blur-md border transition-colors flex items-center gap-1.5 cursor-pointer ${
               activePanel === "background"
-                ? "bg-white/30 text-white border-white/40"
-                : "bg-white/10 text-stone-200 hover:bg-white/20 border-white/15"
+                ? "bg-white/25 text-white border-white/30"
+                : "bg-white/10 text-stone-200 hover:bg-white/15 border-white/15"
             }`}
-            title="Ganti Background Image"
+            title="Latar Suasana"
           >
             <ImageIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Latar</span>
           </button>
 
-          {/* Settings Panel Button */}
           <button
+            type="button"
             onClick={() => setActivePanel(activePanel === "settings" ? null : "settings")}
-            className={`p-2 rounded-xl backdrop-blur-md border transition-all ${
+            className={`p-2 rounded-xl backdrop-blur-md border transition-colors cursor-pointer ${
               activePanel === "settings"
-                ? "bg-white/30 text-white border-white/40"
-                : "bg-white/10 text-stone-200 hover:bg-white/20 border-white/15"
+                ? "bg-white/25 text-white border-white/30"
+                : "bg-white/10 text-stone-200 hover:bg-white/15 border-white/15"
             }`}
-            title="Pengaturan Tampilan & Teks"
+            title="Pengaturan Teks"
           >
             <Settings className="w-4 h-4" />
           </button>
 
-          {/* Fullscreen Button - only on sm+ */}
           <button
+            type="button"
             onClick={toggleFullscreen}
-            className="hidden sm:flex p-2 rounded-xl bg-white/10 hover:bg-white/20 text-stone-200 backdrop-blur-md border border-white/15 transition-all"
-            title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh (Fullscreen)"}
+            className="hidden sm:flex p-2 rounded-xl bg-white/10 hover:bg-white/15 text-stone-200 backdrop-blur-md border border-white/15 transition-colors cursor-pointer"
+            title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
 
-          {/* Close Zen Player */}
           <button
+            type="button"
             onClick={handleClose}
-            className="p-2 rounded-xl bg-white/15 hover:bg-red-500/80 text-white backdrop-blur-md border border-white/20 transition-all shadow-md"
-            title="Kembali ke Mode Normal"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/15 transition-colors cursor-pointer"
+            title="Tutup Ruang Khusyuk"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* 3. Dropdown Floating Modals / Tool Panels */}
-      {/* 3A. Soundscape Mixer Panel */}
+      {/* Panel A: Soundscape */}
       {activePanel === "soundscape" && (
-        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-96 mx-auto sm:mx-0 bg-stone-900/95 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[70vh] overflow-y-auto animate-fade-in-up">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-            <div className="flex items-center gap-2">
-              <Wind className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-bold text-sm">Mixer Suara Alam (Soundscape)</h3>
-            </div>
+        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-96 mx-auto sm:mx-0 bg-[#161E1B]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[68dvh] overflow-y-auto custom-scroll">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Wind className="w-4 h-4 text-emerald-300" />
+              <span>Suara Alam</span>
+            </h3>
             <button
+              type="button"
               onClick={() => setActivePanel(null)}
-              className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white"
+              className="p-1 rounded-lg hover:bg-white/10 text-stone-400 hover:text-white cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <p className="text-[11px] text-stone-400 mt-2 mb-4 leading-relaxed">
-            Nyalakan suara hujan, semilir angin, atau ombak untuk mengiringi lantunan suci Al-Qur&apos;an secara syahdu.
+            Padukan suara rintik hujan, angin, atau malam sebagai pengiring lembut saat menyimak murattal.
           </p>
 
-          {/* Master Ambient Volume */}
-          <div className="bg-stone-800/60 p-3 rounded-2xl border border-stone-700/40 mb-4 space-y-2">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10 mb-4 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-stone-300">Master Volume Suara Alam:</span>
+              <span className="font-medium text-stone-300">Volume Utama</span>
               <button
+                type="button"
                 onClick={handleToggleAmbientMute}
-                className="text-[11px] text-stone-400 hover:text-white flex items-center gap-1"
+                className="text-[11px] text-stone-400 hover:text-white flex items-center gap-1 cursor-pointer"
               >
-                {isAmbientMuted ? <VolumeX className="w-3 h-3 text-red-400" /> : <Volume2 className="w-3 h-3 text-emerald-400" />}
-                <span>{isAmbientMuted ? "Muted" : `${Math.round(masterAmbientVol * 100)}%`}</span>
+                {isAmbientMuted ? (
+                  <VolumeX className="w-3.5 h-3.5 text-red-400" />
+                ) : (
+                  <Volume2 className="w-3.5 h-3.5 text-emerald-300" />
+                )}
+                <span>{isAmbientMuted ? "Bisu" : `${Math.round(masterAmbientVol * 100)}%`}</span>
               </button>
             </div>
             <input
@@ -432,56 +389,43 @@ export default function AnimatedZenPlayer({
               step="0.05"
               value={masterAmbientVol}
               onChange={(e) => handleMasterAmbientVolume(Number(e.target.value))}
-              className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-emerald-400"
             />
           </div>
 
-          {/* Preset Sound List */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {SOUND_PRESETS.map((snd) => {
               const Icon = snd.icon;
               const isActive = !!activeSounds[snd.id];
               const vol = soundVolumes[snd.id] ?? snd.defaultVol;
-
               return (
                 <div
                   key={snd.id}
-                  className={`p-3 rounded-2xl border transition-all ${
+                  className={`p-3 rounded-xl border transition-colors ${
                     isActive
-                      ? "bg-emerald-950/50 border-emerald-600/60 shadow-sm"
-                      : "bg-stone-800/40 border-stone-800 hover:border-stone-700"
+                      ? "bg-emerald-950/50 border-emerald-700/60"
+                      : "bg-white/5 border-white/10"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2.5">
-                      <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                          isActive
-                            ? "bg-emerald-600 text-white"
-                            : "bg-stone-700 text-stone-300"
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-semibold text-white">{snd.label}</span>
+                      <Icon className={`w-4 h-4 ${isActive ? "text-emerald-300" : "text-stone-400"}`} />
+                      <span className="text-xs font-medium text-white">{snd.label}</span>
                     </div>
-
                     <button
+                      type="button"
                       onClick={() => toggleAmbientSound(snd.id)}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs"
-                          : "bg-stone-700 hover:bg-stone-600 text-stone-200"
+                          ? "bg-[#2D6A4F] text-white"
+                          : "bg-white/10 hover:bg-white/15 text-stone-200"
                       }`}
                     >
-                      {isActive ? "Aktif" : "Putar"}
+                      {isActive ? "Aktif" : "Nyalakan"}
                     </button>
                   </div>
-
-                  {/* Volume Slider for each individual sound */}
                   {isActive && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[10px] text-stone-400 w-12">Volume:</span>
+                    <div className="flex items-center gap-2 pt-1.5">
                       <input
                         type="range"
                         min="0.05"
@@ -489,9 +433,9 @@ export default function AnimatedZenPlayer({
                         step="0.05"
                         value={vol}
                         onChange={(e) => handleSoundVolumeChange(snd.id, Number(e.target.value))}
-                        className="flex-1 h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                        className="flex-1 h-1 bg-white/15 rounded-lg appearance-none cursor-pointer accent-emerald-400"
                       />
-                      <span className="text-[10px] text-stone-400 w-8 text-right">
+                      <span className="text-[10px] text-stone-400 w-8 text-right tabular-nums">
                         {Math.round(vol * 100)}%
                       </span>
                     </div>
@@ -503,60 +447,51 @@ export default function AnimatedZenPlayer({
         </div>
       )}
 
-      {/* 3B. Background Selector Panel */}
+      {/* Panel B: Background */}
       {activePanel === "background" && (
-        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-96 mx-auto sm:mx-0 bg-stone-900/95 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[70vh] overflow-y-auto animate-fade-in-up">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-            <div className="flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-bold text-sm">Pilih Gambar Background</h3>
-            </div>
+        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-96 mx-auto sm:mx-0 bg-[#161E1B]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[68dvh] overflow-y-auto custom-scroll">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-emerald-300" />
+              <span>Latar Suasana</span>
+            </h3>
             <button
+              type="button"
               onClick={() => setActivePanel(null)}
-              className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white"
+              className="p-1 rounded-lg hover:bg-white/10 text-stone-400 hover:text-white cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <p className="text-[11px] text-stone-400 mt-2 mb-3">
-            Pilih suasana pemandangan animasi atau pasang gambar pilihan Anda sendiri.
-          </p>
-
-          <div className="grid grid-cols-1 gap-2.5 mb-4">
+          <div className="grid grid-cols-1 gap-2 my-3.5">
             {BACKGROUND_PRESETS.map((bg) => {
               const isSelected = selectedBg === bg.url;
               return (
                 <button
                   key={bg.id}
+                  type="button"
                   onClick={() => handleSelectBg(bg.url)}
-                  className={`flex items-center gap-3 p-2.5 rounded-2xl border text-left transition-all ${
+                  className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-colors cursor-pointer ${
                     isSelected
-                      ? "bg-emerald-950/70 border-emerald-500 shadow-md ring-1 ring-emerald-500"
-                      : "bg-stone-800/40 border-stone-800 hover:border-stone-700 hover:bg-stone-800/70"
+                      ? "bg-emerald-950/60 border-emerald-600"
+                      : "bg-white/5 border-white/10 hover:bg-white/10"
                   }`}
                 >
                   <div
-                    className="w-16 h-12 rounded-xl bg-cover bg-center shrink-0 border border-white/20 shadow-xs"
+                    className="w-14 h-10 rounded-lg bg-cover bg-center shrink-0 border border-white/15"
                     style={{ backgroundImage: `url(${bg.url})` }}
                   />
                   <div className="truncate">
-                    <p className="text-xs font-bold text-white truncate">{bg.name}</p>
+                    <p className="text-xs font-medium text-white truncate">{bg.name}</p>
                     <p className="text-[10px] text-stone-400 truncate">{bg.subtitle}</p>
                   </div>
-                  {isSelected && (
-                    <span className="ml-auto w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                  )}
                 </button>
               );
             })}
           </div>
 
-          {/* Custom Image Upload or URL */}
-          <div className="pt-3 border-t border-stone-800 space-y-2">
-            <span className="text-[11px] font-semibold text-stone-300 block">
-              Gunakan Gambar Sendiri:
-            </span>
+          <div className="pt-3 border-t border-white/10">
             <input
               type="file"
               ref={fileInputRef}
@@ -564,39 +499,38 @@ export default function AnimatedZenPlayer({
               className="hidden"
               onChange={handleFileUpload}
             />
-            <div className="flex gap-2">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 py-2 px-3 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold rounded-xl border border-stone-700 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <ImageIcon className="w-3.5 h-3.5" />
-                <span>Upload Foto / image.png</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-2 px-3 bg-white/10 hover:bg-white/15 text-stone-100 text-xs font-medium rounded-xl border border-white/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>Pilih Gambar dari Perangkat</span>
+            </button>
           </div>
         </div>
       )}
 
-      {/* 3C. Settings Panel (Typography & Overlay) */}
+      {/* Panel C: Display Settings */}
       {activePanel === "settings" && (
-        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-80 mx-auto sm:mx-0 bg-stone-900/95 backdrop-blur-2xl border border-stone-700/60 rounded-3xl p-4 sm:p-5 shadow-2xl text-stone-100 max-h-[70vh] overflow-y-auto animate-fade-in-up space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-bold text-sm">Pengaturan Tampilan</h3>
-            </div>
+        <div className="fixed sm:absolute inset-x-3 bottom-24 sm:bottom-auto sm:inset-auto sm:top-20 sm:right-8 z-30 max-w-sm sm:w-80 mx-auto sm:mx-0 bg-[#161E1B]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 sm:p-5 shadow-2xl text-stone-100 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Settings className="w-4 h-4 text-emerald-300" />
+              <span>Tampilan Ayat</span>
+            </h3>
             <button
+              type="button"
               onClick={() => setActivePanel(null)}
-              className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white"
+              className="p-1 rounded-lg hover:bg-white/10 text-stone-400 hover:text-white cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Arabic Font Size */}
           <div>
-            <span className="text-xs font-semibold text-stone-300 block mb-2">Ukuran Teks Arab:</span>
-            <div className="grid grid-cols-3 gap-1 bg-stone-800 p-1 rounded-xl">
+            <span className="text-xs font-medium text-stone-300 block mb-2">Ukuran Teks Arab</span>
+            <div className="grid grid-cols-3 gap-1 bg-white/5 p-1 rounded-xl">
               {[
                 { id: "normal", label: "Sedang" },
                 { id: "large", label: "Besar" },
@@ -604,11 +538,10 @@ export default function AnimatedZenPlayer({
               ].map((s) => (
                 <button
                   key={s.id}
+                  type="button"
                   onClick={() => setArabicSize(s.id)}
-                  className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    arabicSize === s.id
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "text-stone-400 hover:text-white"
+                  className={`py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                    arabicSize === s.id ? "bg-[#2D6A4F] text-white" : "text-stone-400 hover:text-white"
                   }`}
                 >
                   {s.label}
@@ -617,130 +550,124 @@ export default function AnimatedZenPlayer({
             </div>
           </div>
 
-          {/* Visibility Toggles */}
-          <div className="space-y-2 pt-2 border-t border-stone-800">
-            <label className="flex items-center justify-between text-xs text-stone-300 cursor-pointer">
-              <span>Tampilkan Latin:</span>
+          <div className="space-y-2.5 pt-2 border-t border-white/10 text-xs text-stone-300">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span>Transliterasi Latin</span>
               <input
                 type="checkbox"
                 checked={showLatin}
                 onChange={(e) => setShowLatin(e.target.checked)}
-                className="accent-emerald-500 rounded"
+                className="accent-emerald-500 rounded cursor-pointer"
               />
             </label>
-            <label className="flex items-center justify-between text-xs text-stone-300 cursor-pointer">
-              <span>Tampilkan Terjemahan:</span>
+            <label className="flex items-center justify-between cursor-pointer">
+              <span>Terjemahan Indonesia</span>
               <input
                 type="checkbox"
                 checked={showTranslation}
                 onChange={(e) => setShowTranslation(e.target.checked)}
-                className="accent-emerald-500 rounded"
+                className="accent-emerald-500 rounded cursor-pointer"
               />
             </label>
-            <label className="flex items-center justify-between text-xs text-stone-300 cursor-pointer">
-              <span>Animasi Gerak Background:</span>
+            <label className="flex items-center justify-between cursor-pointer">
+              <span>Gerak Latar Halus</span>
               <input
                 type="checkbox"
                 checked={isKenBurnsActive}
                 onChange={(e) => setIsKenBurnsActive(e.target.checked)}
-                className="accent-emerald-500 rounded"
+                className="accent-emerald-500 rounded cursor-pointer"
               />
             </label>
           </div>
 
-          {/* Overlay Darkness Slider */}
-          <div className="pt-2 border-t border-stone-800 space-y-1.5">
+          <div className="pt-2 border-t border-white/10 space-y-1.5">
             <div className="flex items-center justify-between text-xs text-stone-300">
-              <span>Kegelapan Latar (Kontras):</span>
-              <span>{Math.round(overlayDarkness * 100)}%</span>
+              <span>Redupkan Latar</span>
+              <span className="tabular-nums">{Math.round(overlayDarkness * 100)}%</span>
             </div>
             <input
               type="range"
-              min="0.2"
-              max="0.85"
+              min="0.25"
+              max="0.88"
               step="0.05"
               value={overlayDarkness}
               onChange={(e) => setOverlayDarkness(Number(e.target.value))}
-              className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-emerald-400"
             />
           </div>
         </div>
       )}
 
-      {/* 4. Center Main Content: Ayat Display with Cinematic Animation */}
+      {/* Center Verse Display */}
       <main
-        className="relative z-10 flex-1 flex flex-col justify-center items-center px-4 sm:px-12 py-6 max-w-4xl mx-auto w-full text-center overflow-y-auto"
+        className="relative z-10 flex-1 flex flex-col justify-center items-center px-5 sm:px-12 py-6 max-w-4xl mx-auto w-full text-center overflow-y-auto custom-scroll"
         onClick={() => setActivePanel(null)}
       >
-        <div key={currentTrack?.ayatNomor || "track"} className="animate-fade-in-up space-y-6 sm:space-y-8 my-auto max-w-3xl">
-          {/* Ayat Badge */}
-          {currentTrack?.ayatNomor && (
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-lg text-emerald-300 text-xs sm:text-sm font-bold">
-              <span>Ayat ke-{currentTrack.ayatNomor}</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            </div>
-          )}
-
-          {/* Arabic Text with soft glow */}
+        <div
+          key={currentTrack?.ayatNomor || "track"}
+          className="animate-fade-in-up space-y-6 sm:space-y-8 my-auto max-w-3xl"
+        >
           {currentTrack?.teksArab ? (
             <p
               dir="rtl"
-              className={`font-arabic text-emerald-100 font-bold quran-arabic-glow transition-all duration-300 text-center tracking-normal ${getArabicSizeClass()}`}
+              className={`font-arabic text-[#F5F2EA] quran-arabic-glow text-center ${getArabicSizeClass()}`}
             >
               {currentTrack.teksArab}
+              {currentTrack.ayatNomor && (
+                <span className="ayat-end-ornament" style={{ color: "#D4B680" }}>
+                  {formatAyatMarker(currentTrack.ayatNomor)}
+                </span>
+              )}
             </p>
           ) : (
-            <p className="text-2xl sm:text-3xl font-bold text-white quran-text-glow">
+            <p className="font-editorial text-2xl sm:text-3xl font-semibold text-white quran-text-glow">
               {currentTrack?.title}
             </p>
           )}
 
-          {/* Latin Transliteration */}
           {showLatin && currentTrack?.teksLatin && (
-            <p className="text-sm sm:text-base text-emerald-200/90 font-medium italic quran-text-glow max-w-2xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-[#D4B680]/90 italic quran-text-glow max-w-2xl mx-auto leading-relaxed">
               {currentTrack.teksLatin}
             </p>
           )}
 
-          {/* Indonesian Translation */}
           {showTranslation && currentTrack?.teksIndonesia && (
-            <p className="text-sm sm:text-lg text-stone-200 font-normal leading-relaxed max-w-2xl mx-auto quran-text-glow">
+            <p className="text-sm sm:text-lg text-stone-200 leading-relaxed max-w-2xl mx-auto quran-text-glow">
               &quot;{currentTrack.teksIndonesia}&quot;
             </p>
           )}
         </div>
       </main>
 
-      {/* 5. Bottom Cinematic Player Controls Bar */}
-      <footer className="relative z-20 px-3 sm:px-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-8 pt-3 sm:pt-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-xs">
-        <div className="max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
-          {/* Scrubber Timeline */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="text-[11px] sm:text-xs text-stone-400 w-9 text-right font-medium">
+      {/* Bottom Controls */}
+      <footer className="relative z-20 px-4 sm:px-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-7 pt-3 bg-gradient-to-t from-black/90 via-black/75 to-transparent">
+        <div className="max-w-2xl mx-auto space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-stone-400 w-9 text-right tabular-nums">
               {formatTime(currentTime)}
             </span>
             <input
               type="range"
+              aria-label="Posisi audio"
               min="0"
               max={duration || 100}
               value={currentTime}
               onChange={handleSeek}
-              className="flex-1 h-1.5 bg-stone-700/80 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+              className="flex-1 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-emerald-400"
             />
-            <span className="text-[11px] sm:text-xs text-stone-400 w-9 font-medium">
+            <span className="text-[11px] text-stone-400 w-9 tabular-nums">
               {formatTime(duration)}
             </span>
           </div>
 
-          {/* Playback Controls & Info */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4 pt-0.5">
-            {/* Top row in mobile: Reciter selector and Soundscape summary */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center justify-between w-full sm:w-auto gap-2">
               {setReciterKey && (
                 <select
+                  aria-label="Pilih Qari"
                   value={reciterKey || "05"}
                   onChange={(e) => setReciterKey(e.target.value)}
-                  className="text-xs bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-2.5 py-1.5 text-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400 max-w-[150px] sm:max-w-[180px] truncate cursor-pointer"
+                  className="text-xs bg-white/10 border border-white/15 rounded-xl px-2.5 py-1.5 text-stone-200 max-w-[175px] truncate cursor-pointer"
                 >
                   {Object.entries(RECITERS).map(([key, val]) => (
                     <option key={key} value={key} className="bg-stone-900 text-white">
@@ -750,68 +677,65 @@ export default function AnimatedZenPlayer({
                 </select>
               )}
 
-              {/* Mobile Ambient Sound Quick Indicator */}
               <button
+                type="button"
                 onClick={() => setActivePanel(activePanel === "soundscape" ? null : "soundscape")}
-                className="text-stone-300 hover:text-white flex items-center gap-1.5 text-xs bg-white/10 sm:bg-transparent px-2.5 py-1 sm:p-0 rounded-lg sm:rounded-none border sm:border-0 border-white/15"
-                title="Buka Mixer Suara Alam"
+                className="sm:hidden text-stone-200 flex items-center gap-1.5 text-xs bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/15 cursor-pointer"
               >
-                <Wind className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-[11px]">
-                  {activeSoundCount > 0 ? `${activeSoundCount} Suara Alam` : "Suara Alam"}
-                </span>
+                <Wind className="w-3.5 h-3.5 text-emerald-300" />
+                <span>{activeSoundCount > 0 ? `${activeSoundCount} Suara` : "Suara Alam"}</span>
               </button>
             </div>
 
-            {/* Main Playback Controls: Always centered and uncluttered */}
-            <div className="flex items-center gap-4 sm:gap-6 justify-center">
-              {/* Loop Repeat Button */}
+            <div className="flex items-center gap-4 sm:gap-5 justify-center">
               {setRepeatCount && (
                 <button
+                  type="button"
                   onClick={() => {
                     const nextCycles = [1, 3, 5, 10, Infinity];
                     const currentIdx = nextCycles.indexOf(repeatCount || 1);
-                    const next = nextCycles[(currentIdx + 1) % nextCycles.length];
-                    setRepeatCount(next);
+                    setRepeatCount(nextCycles[(currentIdx + 1) % nextCycles.length]);
                   }}
-                  className={`p-2.5 sm:p-2 rounded-full border transition-all ${
+                  className={`p-2 rounded-full border transition-colors cursor-pointer ${
                     repeatCount > 1
-                      ? "bg-emerald-600 border-emerald-400 text-white shadow-md"
-                      : "bg-white/10 hover:bg-white/20 border-white/15 text-stone-300"
+                      ? "bg-[#2D6A4F] border-emerald-400/50 text-white"
+                      : "bg-white/10 hover:bg-white/15 border-white/15 text-stone-300"
                   }`}
-                  title="Ulangi Ayat (Hafalan Loop)"
+                  title="Ulangi Ayat"
                 >
                   <RotateCw className="w-4 h-4" />
                 </button>
               )}
 
-              {/* Prev Button */}
               <button
+                type="button"
                 onClick={handlePrevTrack}
                 disabled={!hasPrev}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-stone-200 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-all shadow-md active:scale-95"
-                title="Ayat Sebelumnya"
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-stone-200 disabled:opacity-30 flex items-center justify-center transition-colors cursor-pointer"
               >
-                <SkipBack className="w-4 h-4 sm:w-5 sm:h-5" />
+                <SkipBack className="w-4 h-4" />
               </button>
 
-              {/* Big Play/Pause Button */}
               <button
+                type="button"
                 onClick={togglePlay}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-400 hover:from-emerald-500 hover:to-emerald-300 text-white flex items-center justify-center shadow-xl shadow-emerald-950/60 transition-transform hover:scale-105 active:scale-95"
-                title={isPlaying ? "Jeda Audio" : "Putar Audio"}
+                className="w-14 h-14 rounded-full bg-[#2D6A4F] hover:bg-[#388060] text-white flex items-center justify-center shadow-lg transition-colors cursor-pointer"
+                title={isPlaying ? "Jeda" : "Putar"}
               >
-                {isPlaying ? <Pause className="w-6 h-6 sm:w-7 sm:h-7 fill-current" /> : <Play className="w-6 h-6 sm:w-7 sm:h-7 ml-0.5 fill-current" />}
+                {isPlaying ? (
+                  <Pause className="w-6 h-6 fill-current" />
+                ) : (
+                  <Play className="w-6 h-6 ml-0.5 fill-current" />
+                )}
               </button>
 
-              {/* Next Button */}
               <button
+                type="button"
                 onClick={handleNextTrack}
                 disabled={!hasNext}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-stone-200 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-all shadow-md active:scale-95"
-                title="Ayat Selanjutnya"
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-stone-200 disabled:opacity-30 flex items-center justify-center transition-colors cursor-pointer"
               >
-                <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
+                <SkipForward className="w-4 h-4" />
               </button>
             </div>
           </div>

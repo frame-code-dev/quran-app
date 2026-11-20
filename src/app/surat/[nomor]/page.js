@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import SuratDetailView from "@/components/SuratDetailView";
 
 async function getSuratData(nomor) {
@@ -27,15 +28,15 @@ export async function generateMetadata({ params }) {
     const data = await res.json();
     if (data?.data) {
       return {
-        title: `Surat ${data.data.namaLatin} (${data.data.nama}) - Qur'an App`,
-        description: `Baca teks Arab, terjemahan, dengarkan murattal, mode hafalan, dan tadabbur Surat ${data.data.namaLatin}.`,
+        title: `Surat ${data.data.namaLatin} (${data.data.nama}) — Al-Qur'an Al-Karim`,
+        description: `Baca Surat ${data.data.namaLatin} lengkap dengan terjemahan Indonesia, tafsir Kemenag RI, murattal 5 qari, mode mushaf fokus, dan muraja'ah hafalan.`,
       };
     }
-  } catch (e) {
+  } catch {
     // fallback
   }
   return {
-    title: "Surat - Qur'an App",
+    title: "Surat — Al-Qur'an Al-Karim",
   };
 }
 
@@ -46,18 +47,20 @@ export default async function SuratPage({ params, searchParams }) {
   if (!surat) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 text-center">
-        <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-md max-w-sm">
-          <span className="text-4xl mb-3 block">⚠️</span>
-          <h2 className="text-lg font-bold text-stone-900 mb-2">Surat Tidak Ditemukan</h2>
-          <p className="text-xs text-stone-500 mb-4">
-            Terjadi kendala saat memuat data surat nomor {params.nomor}.
+        <div className="surface-card p-8 rounded-3xl border border-theme max-w-sm space-y-3">
+          <h1 className="font-editorial text-xl font-semibold ink-primary">
+            Surat Tidak Ditemukan
+          </h1>
+          <p className="text-xs ink-secondary leading-relaxed">
+            Data surat nomor {params.nomor} belum dapat dimuat saat ini. Periksa koneksi internet
+            Anda atau kembali ke daftar surat.
           </p>
-          <a
+          <Link
             href="/"
-            className="inline-block px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl"
+            className="inline-block px-4 py-2 bg-[#1B4332] hover:bg-[#245640] text-white text-xs font-medium rounded-xl transition-colors"
           >
-            Kembali ke Beranda
-          </a>
+            Kembali ke Daftar Surat
+          </Link>
         </div>
       </div>
     );

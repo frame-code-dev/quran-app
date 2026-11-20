@@ -7,64 +7,212 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  BookOpenText,
+  BookmarkCheck,
   Headphones,
-  Brain,
-  Sparkles,
   Play,
   Pause,
   Bookmark,
-  Volume2,
+  BookMarked,
+  ScrollText,
   Search,
   X,
-  Check,
   Loader2,
   ArrowUpRight,
   Compass,
+  Wind,
+  Share2,
+  SlidersHorizontal,
+  Sun,
+  Moon,
 } from "lucide-react";
 import Navbar from "./Navbar";
 import BottomNav from "./BottomNav";
 import AudioPlayerBar, { RECITERS } from "./AudioPlayerBar";
 import MemorizeMode from "./MemorizeMode";
 import ReflectionModal from "./ReflectionModal";
+import VerseStoryModal from "./VerseStoryModal";
 import Footer from "./Footer";
 import { useRouter, useSearchParams } from "next/navigation";
 import ambientEngine from "@/utils/ambientSound";
 import { executeLocalSmartSearch } from "@/utils/quranSearch";
+import {
+  formatAyatMarker,
+  getLastRead,
+  saveLastRead,
+  getBookmarks,
+  toggleBookmark,
+  getAllNotes,
+  getReadingTheme,
+  applyReadingTheme,
+  attachDialogOutsideClickFallback,
+} from "@/utils/quranStorage";
+
+function normalizeInitialMode(mode) {
+  if (mode === "memorize") return "memorize";
+  if (mode === "mushaf") return "mushaf";
+  return "read";
+}
 
 export default function SuratDetailView({ surat, tafsirData, initialMode = "read" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState(initialMode); // 'read' | 'listen' | 'memorize' | 'reflect'
-  const [isMobileFrame, setIsMobileFrame] = useState(false);
+  // 3 Genuine Reading Modes: 'read' (Tilawah Per-Ayat) | 'mushaf' (Mushaf Fokus) | 'memorize' (Muraja'ah)
+  const [activeMode, setActiveMode] = useState(() => normalizeInitialMode(initialMode));
+  const [showDisplaySettings, setShowDisplaySettings] = useState(false);
 
-  // Settings for reading comfort
-  const [arabicFontSize, setArabicFontSize] = useState("normal"); // 'small' | 'normal' | 'large'
+  // Reading Comfort Settings
+  const [readingTheme, setReadingTheme] = useState("system");
+  const [arabicFontSize, setArabicFontSize] = useState("normal"); // 'small' | 'normal' | 'large' | 'xlarge'
   const [showLatin, setShowLatin] = useState(true);
   const [showTranslation, setShowTranslation] = useState(true);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [autoNextSurat, setAutoNextSurat] = useState(true);
   const [transitioningToNext, setTransitioningToNext] = useState(null);
 
-  // Audio Player state
+  // Mushaf Focus Mode: selected verse for calm bottom inspection sheet
+  const [mushafSelectedAyat, setMushafSelectedAyat] = useState(null);
+
+  // Audio Player State
   const initialReciter = searchParams?.get("reciter") || "05";
-  const [reciterKey, setReciterKey] = useState(initialReciter); // Default: Misyari Rasyid
+  const [reciterKey, setReciterKey] = useState(initialReciter);
   const [repeatCount, setRepeatCount] = useState(1);
+  const [loopRange, setLoopRange] = useState(null); // { startIdx, endIdx, startAyat, endAyat }
   const [currentTrack, setCurrentTrack] = useState(null);
   const [activeAyatIndex, setActiveAyatIndex] = useState(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const initialZen = searchParams?.get("zen") === "true";
-  const [isZenOpen, setIsZenOpen] = useState(initialZen);
+  const [isZenOpen, setIsZenOpen] = useState(searchParams?.get("zen") === "true");
   const audioToggleRef = useRef(null);
 
-  // Confirmation modal when returning to home while audio is active
+  // Native <dialog> for audio-exit confirmation
   const [isBackConfirmOpen, setIsBackConfirmOpen] = useState(false);
+  const backConfirmDialogRef = useRef(null);
+
+  // Modals: Tafsir/Tadabbur & Story Card 9:16 (for ANY verse!)
+  const [selectedAyatForReflection, setSelectedAyatForReflection] = useState(null);
+  const [isReflectionModalOpen, setIsReflectionModalOpen] = useState(false);
+  const [storyVerseData, setStoryVerseData] = useState(null);
+  const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
+
+  // Local Storage Synced States (Last Read, Multi-Bookmarks, Notes)
+  const [savedLastRead, setSavedLastRead] = useState(null);
+  const [bookmarkedSet, setBookmarkedSet] = useState(() => new Set());
+  const [notedSet, setNotedSet] = useState(() => new Set());
+
+  // Search States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [contextSearchResults, setContextSearchResults] = useState([]);
+  const [isLoadingContextSearch, setIsLoadingContextSearch] = useState(false);
+  const [activeJumpAyat, setActiveJumpAyat] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = useCallback((msg) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2600);
+  }, []);
+
+  const syncStorage = useCallback(() => {
+    setSavedLastRead(getLastRead());
+    setReadingTheme(getReadingTheme());
+    const bList = getBookmarks();
+    setBookmarkedSet(new Set(bList.map((b) => `${b.suratNomor}:${b.nomorAyat}`)));
+    const nList = getAllNotes();
+    setNotedSet(new Set(nList.map((n) => `${n.suratNomor}:${n.nomorAyat}`)));
+  }, []);
 
   useEffect(() => {
-    if (searchParams?.get("zen") === "true") {
-      setIsZenOpen(true);
+    syncStorage();
+    try {
+      const savedAutoNext = localStorage.getItem("quran_auto_next");
+      if (savedAutoNext !== null) setAutoNextSurat(savedAutoNext === "true");
+    } catch {}
+    window.addEventListener("quran-storage-update", syncStorage);
+    return () => window.removeEventListener("quran-storage-update", syncStorage);
+  }, [syncStorage]);
+
+  // Native <dialog> sync for audio exit confirmation
+  useEffect(() => {
+    const dialog = backConfirmDialogRef.current;
+    if (!dialog) return;
+    if (isBackConfirmOpen) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
     }
+  }, [isBackConfirmOpen]);
+
+  useEffect(() => {
+    const dialog = backConfirmDialogRef.current;
+    if (!dialog) return;
+    const handleClose = () => {
+      dialog.returnValue = "";
+      setIsBackConfirmOpen(false);
+    };
+    dialog.addEventListener("close", handleClose);
+    const detach = attachDialogOutsideClickFallback(dialog, () => setIsBackConfirmOpen(false));
+    return () => {
+      dialog.removeEventListener("close", handleClose);
+      detach();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (searchParams?.get("zen") === "true") setIsZenOpen(true);
   }, [searchParams]);
+
+  // URL ?ayat=X or #ayat-X jump
+  useEffect(() => {
+    const targetAyatParam = searchParams?.get("ayat");
+    let targetAyat = targetAyatParam ? parseInt(targetAyatParam, 10) : null;
+    if (!targetAyat && typeof window !== "undefined" && window.location.hash) {
+      const match = window.location.hash.match(/ayat-(\d+)/);
+      if (match) targetAyat = parseInt(match[1], 10);
+    }
+    if (targetAyat && surat?.ayat?.some((a) => a.nomorAyat === targetAyat)) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`ayat-${targetAyat}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          setActiveJumpAyat(targetAyat);
+          setTimeout(() => setActiveJumpAyat(null), 2600);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [surat?.nomor, surat?.ayat, searchParams]);
+
+  // Auto-scroll active reciting ayah
+  useEffect(() => {
+    if (autoScrollEnabled && currentTrack?.ayatNomor && isPlayingAudio) {
+      const element = document.getElementById(`ayat-${currentTrack.ayatNomor}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [currentTrack?.ayatNomor, isPlayingAudio, autoScrollEnabled]);
+
+  // Prefetch next surah
+  useEffect(() => {
+    if (surat?.suratSelanjutnya?.nomor) {
+      router.prefetch(`/surat/${surat.suratSelanjutnya.nomor}`);
+    }
+  }, [surat?.suratSelanjutnya?.nomor, router]);
+
+  const handleThemeSelect = (themeId) => {
+    setReadingTheme(themeId);
+    applyReadingTheme(themeId);
+  };
+
+  const handleToggleAutoNext = (val) => {
+    setAutoNextSurat(val);
+    try {
+      localStorage.setItem("quran_auto_next", String(val));
+    } catch {}
+  };
 
   const handleBackClick = (e) => {
     if (e) e.preventDefault();
@@ -88,122 +236,55 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
           isPlaying: isPlayingAudio,
         })
       );
-    } catch (e) {}
+    } catch {}
     setIsBackConfirmOpen(false);
     router.push("/");
   };
 
   const handleStopAndGoHome = () => {
-    if (audioToggleRef.current && isPlayingAudio) {
-      audioToggleRef.current();
-    }
-    if (ambientEngine) {
-      ambientEngine.stopAll();
-    }
+    if (audioToggleRef.current && isPlayingAudio) audioToggleRef.current();
+    if (ambientEngine) ambientEngine.stopAll();
     try {
       sessionStorage.removeItem("quran_playback_transfer");
-    } catch (e) {}
+    } catch {}
     setIsBackConfirmOpen(false);
     router.push("/");
   };
 
-  const handlePlayStateChange = useCallback((playing) => {
-    setIsPlayingAudio(playing);
-  }, []);
-
-  // Reflection Modal state
-  const [selectedAyatForReflection, setSelectedAyatForReflection] = useState(null);
-  const [isReflectionModalOpen, setIsReflectionModalOpen] = useState(false);
-
-  // Bookmarking & Search States
-  const [savedLastRead, setSavedLastRead] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [aiSearchResults, setAiSearchResults] = useState([]);
-  const [isLoadingAi, setIsLoadingAi] = useState(false);
-  const [activeJumpAyat, setActiveJumpAyat] = useState(null);
-  const [toastMessage, setToastMessage] = useState(null);
-  const toastTimeoutRef = useRef(null);
-
-  const showToast = useCallback((msg) => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToastMessage(msg);
-    toastTimeoutRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("quran_last_read");
-      if (saved) {
-        setSavedLastRead(JSON.parse(saved));
-      }
-      const savedAutoNext = localStorage.getItem("quran_auto_next");
-      if (savedAutoNext !== null) {
-        setAutoNextSurat(savedAutoNext === "true");
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
-  // Auto-scroll listener saat navigasi URL param ?ayat=X atau #ayat-X
-  useEffect(() => {
-    const targetAyatParam = searchParams?.get("ayat");
-    let targetAyat = targetAyatParam ? parseInt(targetAyatParam, 10) : null;
-
-    if (!targetAyat && typeof window !== "undefined" && window.location.hash) {
-      const match = window.location.hash.match(/ayat-(\d+)/);
-      if (match) targetAyat = parseInt(match[1], 10);
-    }
-
-    if (targetAyat && surat?.ayat?.some((a) => a.nomorAyat === targetAyat)) {
-      const timer = setTimeout(() => {
-        const el = document.getElementById(`ayat-${targetAyat}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          setActiveJumpAyat(targetAyat);
-          setTimeout(() => setActiveJumpAyat(null), 3000);
-        }
-      }, 350);
-      return () => clearTimeout(timer);
-    }
-  }, [surat?.nomor, surat?.ayat, searchParams]);
-
-  const handleToggleAutoNext = (val) => {
-    setAutoNextSurat(val);
-    try {
-      localStorage.setItem("quran_auto_next", String(val));
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  // Auto-scroll to active reciting ayah
-  useEffect(() => {
-    if (autoScrollEnabled && currentTrack?.ayatNomor && isPlayingAudio) {
-      const element = document.getElementById(`ayat-${currentTrack.ayatNomor}`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }
-  }, [currentTrack?.ayatNomor, isPlayingAudio, autoScrollEnabled]);
-
-  const saveAsLastRead = (ayat) => {
-    const payload = {
+  const handleMarkLastRead = (ayat) => {
+    saveLastRead({
       nomor: surat.nomor,
       namaLatin: surat.namaLatin,
       ayat: ayat.nomorAyat,
-      timestamp: Date.now(),
-    };
-    try {
-      localStorage.setItem("quran_last_read", JSON.stringify(payload));
-      setSavedLastRead(payload);
-      showToast(`Ayat ${ayat.nomorAyat} ditandai sebagai bacaan terakhir`);
-    } catch (e) {
-      // ignore
-    }
+    });
+    showToast(`Ayat ${ayat.nomorAyat} ditandai sebagai bacaan terakhir`);
+  };
+
+  const handleToggleFavorite = (ayat) => {
+    const res = toggleBookmark({
+      suratNomor: surat.nomor,
+      suratNamaLatin: surat.namaLatin,
+      nomorAyat: ayat.nomorAyat,
+      teksArab: ayat.teksArab,
+      teksIndonesia: ayat.teksIndonesia,
+    });
+    showToast(
+      res.saved
+        ? `Ayat ${ayat.nomorAyat} disimpan ke Koleksi`
+        : `Ayat ${ayat.nomorAyat} dihapus dari Koleksi`
+    );
+  };
+
+  const openStoryModal = (ayat) => {
+    setStoryVerseData({
+      suratNomor: surat.nomor,
+      suratNamaLatin: surat.namaLatin,
+      nomorAyat: ayat.nomorAyat,
+      teksArab: ayat.teksArab,
+      teksLatin: ayat.teksLatin,
+      teksIndonesia: ayat.teksIndonesia,
+    });
+    setIsStoryModalOpen(true);
   };
 
   const jumpToTargetAyat = (ayatNum) => {
@@ -211,8 +292,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       setActiveJumpAyat(ayatNum);
-      setTimeout(() => setActiveJumpAyat(null), 3000);
-      showToast(`Fokus ke Ayat ${ayatNum}`);
+      setTimeout(() => setActiveJumpAyat(null), 2600);
     }
   };
 
@@ -227,9 +307,9 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
     }
   };
 
-  const handleTriggerAiSearch = async () => {
-    if (!searchQuery.trim() || isLoadingAi) return;
-    setIsLoadingAi(true);
+  const handleContextualSearch = async () => {
+    if (!searchQuery.trim() || isLoadingContextSearch) return;
+    setIsLoadingContextSearch(true);
     try {
       const res = await fetch("/api/search", {
         method: "POST",
@@ -237,38 +317,25 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
         body: JSON.stringify({ query: searchQuery }),
       });
       const data = await res.json();
-      if (data?.results) {
-        setAiSearchResults(data.results);
-      }
+      if (data?.results) setContextSearchResults(data.results);
     } catch (e) {
-      console.error("Gagal melakukan pencarian AI:", e);
+      console.error("Gagal menelusuri topik:", e);
     } finally {
-      setIsLoadingAi(false);
+      setIsLoadingContextSearch(false);
     }
   };
 
-  const scrollToBookmarkedAyat = () => {
-    if (savedLastRead?.nomor === surat.nomor) {
-      jumpToTargetAyat(savedLastRead.ayat);
-    } else if (savedLastRead) {
-      router.push(`/surat/${savedLastRead.nomor}?ayat=${savedLastRead.ayat}#ayat-${savedLastRead.ayat}`);
-    }
-  };
-
-  // Play verse by index in surat.ayat array
   const playAyatIndex = useCallback(
     (index, customRepeat = 1) => {
       if (!surat.ayat || index < 0 || index >= surat.ayat.length) return;
       const ayat = surat.ayat[index];
       setActiveAyatIndex(index);
-      if (customRepeat !== undefined) {
-        setRepeatCount(customRepeat);
-      }
+      if (customRepeat !== undefined) setRepeatCount(customRepeat);
 
       const audioUrl = ayat.audio?.[reciterKey] || Object.values(ayat.audio || {})[0];
       setCurrentTrack({
         title: `QS. ${surat.namaLatin} : Ayat ${ayat.nomorAyat}`,
-        audioUrl: audioUrl,
+        audioUrl,
         ayatNomor: ayat.nomorAyat,
         ayatIndex: index,
         totalAyat: surat.jumlahAyat,
@@ -283,13 +350,21 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
   );
 
   const playAyat = (ayat, customRepeat = 1) => {
+    setLoopRange(null);
     const idx = surat.ayat.findIndex((a) => a.nomorAyat === ayat.nomorAyat);
-    if (idx !== -1) {
-      playAyatIndex(idx, customRepeat);
+    if (idx !== -1) playAyatIndex(idx, customRepeat);
+  };
+
+  const handleStartRangeLoop = (startAyat, endAyat) => {
+    const startIdx = surat.ayat.findIndex((a) => a.nomorAyat === startAyat);
+    const endIdx = surat.ayat.findIndex((a) => a.nomorAyat === endAyat);
+    if (startIdx !== -1 && endIdx !== -1 && startIdx <= endIdx) {
+      setLoopRange({ startIdx, endIdx, startAyat, endAyat });
+      playAyatIndex(startIdx, 1);
+      showToast(`Mengulang blok Ayat ${startAyat} sampai ${endAyat}`);
     }
   };
 
-  // Toggle pause/play on current active verse, or start playing if different verse
   const handleVerseAudioClick = (ayat) => {
     const isPlayingThis =
       currentTrack?.ayatNomor === ayat.nomorAyat &&
@@ -301,60 +376,42 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
     }
   };
 
-  // Start sequential recitation from beginning of surah
   const playSuratSequential = () => {
-    if (surat.ayat && surat.ayat.length > 0) {
-      playAyatIndex(0, 1);
-    }
+    setLoopRange(null);
+    if (surat.ayat && surat.ayat.length > 0) playAyatIndex(0, 1);
   };
 
-  // Open Animated Zen Recitation Mode
-  const openZenMode = () => {
-    if (!currentTrack) {
-      playSuratSequential();
-    }
+  const openKhusyukMode = () => {
+    if (!currentTrack) playSuratSequential();
     setIsZenOpen(true);
   };
 
-  // Next & Previous Surat Navigation
   const handleNextSurat = useCallback(() => {
     if (surat?.suratSelanjutnya?.nomor) {
       setTransitioningToNext(surat.suratSelanjutnya.namaLatin);
       const zenParam = isZenOpen ? "&zen=true" : "";
       router.push(
-        `/surat/${surat.suratSelanjutnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}${zenParam}`
+        `/surat/${surat.suratSelanjutnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeMode}${zenParam}`
       );
     }
-  }, [surat?.suratSelanjutnya, reciterKey, activeTab, isZenOpen, router]);
+  }, [surat?.suratSelanjutnya, reciterKey, activeMode, isZenOpen, router]);
 
   const handlePrevSurat = useCallback(() => {
     if (surat?.suratSebelumnya?.nomor) {
       const zenParam = isZenOpen ? "&zen=true" : "";
       router.push(
-        `/surat/${surat.suratSebelumnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeTab}${zenParam}`
+        `/surat/${surat.suratSebelumnya.nomor}?autoplay=true&reciter=${reciterKey}&mode=${activeMode}${zenParam}`
       );
     }
-  }, [surat?.suratSebelumnya, reciterKey, activeTab, isZenOpen, router]);
+  }, [surat?.suratSebelumnya, reciterKey, activeMode, isZenOpen, router]);
 
-  // Auto-play when navigated with ?autoplay=true
   useEffect(() => {
-    const isAutoPlay = searchParams?.get("autoplay") === "true";
-    if (isAutoPlay && surat?.ayat?.length > 0) {
-      const timer = setTimeout(() => {
-        playAyatIndex(0, 1);
-      }, 150);
+    if (searchParams?.get("autoplay") === "true" && surat?.ayat?.length > 0) {
+      const timer = setTimeout(() => playAyatIndex(0, 1), 150);
       return () => clearTimeout(timer);
     }
   }, [surat?.nomor, surat?.ayat?.length, searchParams, playAyatIndex]);
 
-  // Prefetch next surat for instantaneous transition
-  useEffect(() => {
-    if (surat?.suratSelanjutnya?.nomor) {
-      router.prefetch(`/surat/${surat.suratSelanjutnya.nomor}`);
-    }
-  }, [surat?.suratSelanjutnya?.nomor, router]);
-
-  // Open AI reflection modal for an ayat
   const openReflection = (ayat) => {
     const tafsirObj = tafsirData?.tafsir?.find((t) => t.ayat === ayat.nomorAyat);
     setSelectedAyatForReflection({
@@ -370,258 +427,370 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
   };
 
   const getFontSizeClass = () => {
-    if (arabicFontSize === "small") return "text-xl sm:text-2xl leading-[2.2]";
-    if (arabicFontSize === "large") return "text-3xl sm:text-4xl leading-[2.6]";
-    return "text-2xl sm:text-3xl leading-[2.4]";
+    if (arabicFontSize === "small") return "text-xl sm:text-2xl leading-[2.3]";
+    if (arabicFontSize === "large") return "text-3xl sm:text-4xl leading-[2.55]";
+    if (arabicFontSize === "xlarge") return "text-4xl sm:text-[42px] leading-[2.65]";
+    return "text-2xl sm:text-[30px] leading-[2.45]";
   };
 
   const isBismillahShown = surat.nomor !== 1 && surat.nomor !== 9;
 
+  const detailBottomTabs = [
+    { id: "read", label: "Tilawah", icon: BookOpen },
+    { id: "mushaf", label: "Mushaf", icon: BookOpenText },
+    { id: "memorize", label: "Muraja'ah", icon: BookmarkCheck },
+    { id: "khusyuk", label: "Khusyuk", icon: Wind },
+  ];
+
+  const handleBottomTabClick = (tabId) => {
+    if (tabId === "khusyuk") {
+      openKhusyukMode();
+    } else {
+      setActiveMode(tabId);
+      setMushafSelectedAyat(null);
+    }
+  };
+
   return (
     <div
-      className={`min-h-screen transition-all duration-300 ${
-        currentTrack ? "pb-44 sm:pb-36" : "pb-28"
-      } ${
-        isMobileFrame
-          ? "max-w-md mx-auto my-4 sm:my-8 bg-white border-4 border-stone-800 rounded-[2.5rem] shadow-2xl overflow-hidden relative"
-          : "max-w-5xl mx-auto px-3 sm:px-6"
+      className={`min-h-screen transition-colors ${
+        currentTrack || mushafSelectedAyat ? "pb-48 md:pb-36" : "pb-24 md:pb-12"
       }`}
     >
-      {/* Mobile Frame Speaker / Camera Notch if in Mobile Frame Mode */}
-      {isMobileFrame && (
-        <div className="w-full bg-stone-800 py-1.5 flex justify-center items-center">
-          <div className="w-20 h-3.5 bg-stone-900 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 rounded-full bg-stone-700 mr-2"></div>
-            <div className="w-8 h-1 rounded-full bg-stone-700"></div>
-          </div>
-        </div>
-      )}
+      <Navbar />
 
-      {/* Navigation Bar */}
-      <Navbar isMobileFrame={isMobileFrame} setIsMobileFrame={setIsMobileFrame} />
-
-      <main className="mt-4 sm:mt-6 space-y-6">
-        {/* Top Breadcrumb & Back */}
-        <div className="flex items-center justify-between gap-2 px-0.5">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6 space-y-5">
+        {/* Top Navigation Row */}
+        <div className="flex items-center justify-between gap-2">
           <button
+            type="button"
             onClick={handleBackClick}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 px-2.5 sm:px-3 py-1.5 rounded-xl transition-colors border border-stone-200 cursor-pointer shadow-xs shrink-0"
+            className="inline-flex items-center gap-1.5 text-xs font-medium surface-card border border-theme hover:border-[var(--border-strong)] ink-primary px-3 py-1.5 rounded-xl transition-colors cursor-pointer shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Beranda</span>
+            <span>Daftar Surat</span>
           </button>
 
           <div className="flex items-center gap-1 text-xs truncate">
             {surat.suratSebelumnya && (
               <Link
                 href={`/surat/${surat.suratSebelumnya.nomor}`}
-                className="inline-flex items-center gap-1 px-2 py-1 text-stone-600 hover:text-emerald-900 hover:bg-stone-100 rounded-lg transition-colors truncate max-w-[110px] sm:max-w-none"
+                className="inline-flex items-center gap-1 px-2.5 py-1 ink-muted hover:ink-primary rounded-lg transition-colors truncate max-w-[125px] sm:max-w-none"
                 title={`Sebelumnya: ${surat.suratSebelumnya.namaLatin}`}
               >
-                <ChevronLeft className="w-3 h-3 shrink-0" />
+                <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">{surat.suratSebelumnya.namaLatin}</span>
               </Link>
             )}
             {surat.suratSelanjutnya && (
               <Link
                 href={`/surat/${surat.suratSelanjutnya.nomor}`}
-                className="inline-flex items-center gap-1 px-2 py-1 text-stone-600 hover:text-emerald-900 hover:bg-stone-100 rounded-lg transition-colors truncate max-w-[110px] sm:max-w-none"
+                className="inline-flex items-center gap-1 px-2.5 py-1 ink-muted hover:ink-primary rounded-lg transition-colors truncate max-w-[125px] sm:max-w-none"
                 title={`Selanjutnya: ${surat.suratSelanjutnya.namaLatin}`}
               >
                 <span className="truncate">{surat.suratSelanjutnya.namaLatin}</span>
-                <ChevronRight className="w-3 h-3 shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 shrink-0" />
               </Link>
             )}
           </div>
         </div>
 
-        {/* Hero Surah Card - Authentic Heritage Tone without AI slop */}
-        <div className="bg-[#1B4332] text-stone-100 rounded-3xl p-6 sm:p-8 shadow-sm border border-stone-700/30 text-center relative overflow-hidden">
-          <div className="relative z-10 max-w-xl mx-auto space-y-3">
-            <span className="inline-block text-xs uppercase tracking-widest text-emerald-200 font-semibold px-3 py-1 rounded-full bg-white/10">
-              Surat ke-{surat.nomor} • {surat.tempatTurun}
-            </span>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+        {/* Surah Masthead Card */}
+        <header className="bg-[#1B4332] text-stone-100 rounded-3xl p-6 sm:p-8 border border-white/10 text-center">
+          <div className="max-w-xl mx-auto space-y-2.5">
+            <p className="text-[11px] uppercase tracking-widest text-[#D4B680] font-medium">
+              Surat ke-{surat.nomor} • {surat.tempatTurun} • {surat.jumlahAyat} Ayat
+            </p>
+            <h1 className="font-editorial text-3xl sm:text-4xl font-semibold tracking-tight text-white">
               {surat.namaLatin}
             </h1>
-            <p className="font-arabic text-4xl sm:text-5xl text-emerald-200 font-bold my-2">
+            <p className="font-arabic text-4xl sm:text-5xl text-[#F7F4EC] text-center leading-relaxed pt-1">
               {surat.nama}
             </p>
-            <p className="text-xs sm:text-sm text-stone-300 italic">
-              &quot;{surat.arti}&quot; • {surat.jumlahAyat} Ayat
-            </p>
+            <p className="text-xs sm:text-sm text-stone-300 italic">&quot;{surat.arti}&quot;</p>
 
-            {/* Quick action bar */}
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+            {/* Audio & Qari Action Row */}
+            <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
               <button
+                type="button"
                 onClick={playSuratSequential}
-                className="inline-flex items-center gap-1.5 bg-white text-emerald-950 hover:bg-stone-100 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all"
+                className="inline-flex items-center gap-1.5 bg-[#F7F4EC] text-[#1B4332] hover:bg-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Putar Surat (Sinkron Ayat)</span>
+                <span>Putar Murattal</span>
               </button>
+
               <button
-                onClick={openZenMode}
-                className="inline-flex items-center gap-1.5 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-emerald-400/30 shadow-xs"
-                title="Buka Mode Animasi Sinematik & Suara Alam"
+                type="button"
+                onClick={openKhusyukMode}
+                className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-stone-100 px-4 py-2 rounded-xl text-xs font-medium border border-white/15 transition-colors cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
-                <span>Mode Animasi & Alam</span>
+                <Wind className="w-3.5 h-3.5 text-[#D4B680]" />
+                <span>Ruang Khusyuk</span>
               </button>
-              <button
-                onClick={() => setActiveTab("memorize")}
-                className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-all border border-white/10"
+
+              <select
+                aria-label="Pilih Qari Murattal"
+                value={reciterKey}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setReciterKey(next);
+                  if (activeAyatIndex !== null && surat.ayat[activeAyatIndex]) {
+                    const currentAyat = surat.ayat[activeAyatIndex];
+                    const nextUrl =
+                      currentAyat.audio?.[next] || Object.values(currentAyat.audio || {})[0];
+                    setCurrentTrack((prev) => (prev ? { ...prev, audioUrl: nextUrl } : null));
+                  }
+                }}
+                className="bg-white/10 border border-white/15 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none cursor-pointer max-w-[175px] truncate"
               >
-                <Brain className="w-3.5 h-3.5" />
-                <span>Mode Hafalan</span>
-              </button>
+                {Object.entries(RECITERS).map(([key, val]) => (
+                  <option key={key} value={key} className="bg-stone-900 text-white">
+                    {val.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* 4 Pillars Tab Header Switcher */}
-        <div className="bg-white p-1.5 rounded-2xl border border-stone-200 shadow-xs">
-          <div className="grid grid-cols-4 gap-1">
+        {/* Clean 3-Mode Bar + Display Settings Toggle */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div
+            role="tablist"
+            aria-label="Mode tampilan surat"
+            className="surface-card p-1 rounded-2xl border border-theme grid grid-cols-3 gap-1 flex-1 sm:max-w-md"
+          >
             {[
-              { id: "read", label: "Read", icon: BookOpen, sub: "Baca & Terjemah" },
-              { id: "listen", label: "Listen", icon: Headphones, sub: "Murattal Player" },
-              { id: "memorize", label: "Memorize", icon: Brain, sub: "Mode Hafalan" },
-              { id: "reflect", label: "Reflect", icon: Sparkles, sub: "AI Tadabbur" },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              const Icon = tab.icon;
+              { id: "read", label: "Tilawah", icon: BookOpen },
+              { id: "mushaf", label: "Mushaf Fokus", icon: BookOpenText },
+              { id: "memorize", label: "Muraja'ah", icon: BookmarkCheck },
+            ].map((mode) => {
+              const Icon = mode.icon;
+              const active = activeMode === mode.id;
               return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-2.5 px-2 rounded-xl text-center transition-all duration-200 flex flex-col items-center justify-center ${
-                    isActive
-                      ? "bg-emerald-800 text-white shadow-xs font-bold"
-                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-50"
+                  key={mode.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setActiveMode(mode.id);
+                    setMushafSelectedAyat(null);
+                  }}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                    active
+                      ? "bg-[#1B4332] text-white"
+                      : "ink-secondary hover:ink-primary"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-xs mt-1 tracking-tight">{tab.label}</span>
-                  <span
-                    className={`text-[10px] hidden sm:block font-normal ${
-                      isActive ? "text-emerald-200" : "text-stone-400"
-                    }`}
-                  >
-                    {tab.sub}
-                  </span>
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{mode.label}</span>
                 </button>
               );
             })}
           </div>
+
+          {activeMode !== "memorize" && (
+            <button
+              type="button"
+              onClick={() => setShowDisplaySettings((v) => !v)}
+              aria-expanded={showDisplaySettings}
+              className={`px-3.5 py-2.5 rounded-2xl border text-xs font-medium inline-flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                showDisplaySettings
+                  ? "bg-[#1B4332] text-white border-[#1B4332]"
+                  : "surface-card border-theme ink-primary hover:border-[var(--border-strong)]"
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Tampilan &amp; Kertas</span>
+            </button>
+          )}
         </div>
 
-        {/* TAB 1: READ (Quran + Translation) */}
-        {activeTab === "read" && (
-          <div className="space-y-4">
-            {/* Smart Search & Quick Jump Bar */}
-            <div className="relative">
-              <div className="bg-white rounded-2xl p-2 sm:p-2.5 border border-stone-200 shadow-xs flex items-center gap-2">
-                {/* Search Input Box */}
-                <div className="relative flex-1 flex items-center">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => setIsSearchFocused(true)}
-                    placeholder="Cari ayat (contoh: nisa 136, 100 dinar, hutang, jodoh, 136)..."
-                    className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-stone-50 hover:bg-stone-100/70 focus:bg-white border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 transition-all"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => {
-                        setSearchQuery("");
-                        setAiSearchResults([]);
-                      }}
-                      className="absolute right-2.5 text-stone-400 hover:text-stone-600 p-1"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+        {/* Collapsible Reading Preferences Bar (Theme, Font Size, Toggles) */}
+        {showDisplaySettings && activeMode !== "memorize" && (
+          <div className="surface-card rounded-2xl p-4 border border-theme space-y-4 animate-fade-in-up text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Paper Theme Selector */}
+              <div className="space-y-2">
+                <span className="font-semibold ink-primary block">Tema Kertas Baca</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "mushaf", label: "Mushaf", icon: BookOpenText },
+                    { id: "light", label: "Terang", icon: Sun },
+                    { id: "dark", label: "Malam", icon: Moon },
+                  ].map((t) => {
+                    const Icon = t.icon;
+                    const active = readingTheme === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => handleThemeSelect(t.id)}
+                        className={`py-2 px-2.5 rounded-xl border font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                          active
+                            ? "bg-[#1B4332] text-white border-[#1B4332]"
+                            : "surface-elevated border-theme ink-secondary hover:ink-primary"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{t.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                {/* Bookmark Jump Shortcut Button */}
-                {savedLastRead && (
-                  <button
-                    onClick={scrollToBookmarkedAyat}
-                    className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
-                      savedLastRead.nomor === surat.nomor
-                        ? "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300/80 shadow-2xs"
-                        : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
-                    }`}
-                    title={
-                      savedLastRead.nomor === surat.nomor
-                        ? `Lompat ke Ayat ${savedLastRead.ayat} (Tanda Baca Terakhir)`
-                        : `Buka Bacaan Terakhir: QS. ${savedLastRead.namaLatin} Ayat ${savedLastRead.ayat}`
-                    }
-                  >
-                    <Bookmark
-                      className={`w-3.5 h-3.5 ${
-                        savedLastRead.nomor === surat.nomor
-                          ? "fill-amber-500 text-amber-600"
-                          : "text-stone-500"
+              {/* Arabic Font Size */}
+              <div className="space-y-2">
+                <span className="font-semibold ink-primary block">Ukuran Huruf Arab</span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { id: "small", label: "Kecil" },
+                    { id: "normal", label: "Sedang" },
+                    { id: "large", label: "Besar" },
+                    { id: "xlarge", label: "Ekstra" },
+                  ].map((sz) => (
+                    <button
+                      key={sz.id}
+                      type="button"
+                      onClick={() => setArabicFontSize(sz.id)}
+                      className={`py-2 px-2 rounded-xl border font-medium transition-colors cursor-pointer ${
+                        arabicFontSize === sz.id
+                          ? "bg-[#1B4332] text-white border-[#1B4332]"
+                          : "surface-elevated border-theme ink-secondary hover:ink-primary"
                       }`}
+                    >
+                      {sz.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Checkboxes Row */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-theme ink-secondary">
+              {activeMode === "read" && (
+                <>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showLatin}
+                      onChange={(e) => setShowLatin(e.target.checked)}
+                      className="accent-[#1B4332] rounded cursor-pointer"
                     />
-                    <span className="hidden sm:inline">
-                      {savedLastRead.nomor === surat.nomor
-                        ? `Ayat ${savedLastRead.ayat}`
-                        : `${savedLastRead.namaLatin}:${savedLastRead.ayat}`}
-                    </span>
-                    <span className="sm:hidden font-bold">
-                      {savedLastRead.nomor === surat.nomor ? savedLastRead.ayat : "Terakhir"}
-                    </span>
+                    <span>Transliterasi Latin</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showTranslation}
+                      onChange={(e) => setShowTranslation(e.target.checked)}
+                      className="accent-[#1B4332] rounded cursor-pointer"
+                    />
+                    <span>Terjemahan Indonesia</span>
+                  </label>
+                </>
+              )}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoScrollEnabled}
+                  onChange={(e) => setAutoScrollEnabled(e.target.checked)}
+                  className="accent-[#1B4332] rounded cursor-pointer"
+                />
+                <span>Ikuti Ayat Otomatis</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoNextSurat}
+                  onChange={(e) => handleToggleAutoNext(e.target.checked)}
+                  className="accent-[#1B4332] rounded cursor-pointer"
+                />
+                <span>Lanjut ke Surat Berikutnya</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Jump & Contextual Search (In Tilawah & Mushaf Modes) */}
+        {activeMode !== "memorize" && (
+          <div className="relative">
+            <div className="surface-card rounded-2xl p-2 border border-theme flex items-center gap-2">
+              <div className="relative flex-1 flex items-center">
+                <Search className="w-4 h-4 ink-muted absolute left-3 pointer-events-none" />
+                <input
+                  type="search"
+                  aria-label="Lompat ke ayat atau cari topik"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  placeholder={`Lompat ke ayat (1–${surat.jumlahAyat}), surat lain (2:255), atau topik...`}
+                  className="w-full pl-9 pr-8 py-1.5 text-xs sm:text-sm surface-elevated border border-transparent focus:border-emerald-700 rounded-xl ink-primary placeholder:text-[var(--ink-muted)] focus:outline-none transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setContextSearchResults([]);
+                    }}
+                    className="absolute right-2.5 ink-muted hover:ink-primary p-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Dropdown Hasil Pencarian Cerdas & Tematik */}
-              {isSearchFocused && searchQuery.trim().length > 0 && (() => {
-                const localResults = executeLocalSmartSearch(searchQuery, surat);
-                const hasPattern = !!localResults.patternResult;
-                const hasThematic = localResults.thematicResults.length > 0;
-                const hasAi = aiSearchResults.length > 0;
-                const hasSurah = localResults.surahResults.length > 0;
+              {savedLastRead && savedLastRead.nomor === surat.nomor && (
+                <button
+                  type="button"
+                  onClick={() => jumpToTargetAyat(savedLastRead.ayat)}
+                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium surface-brass-soft border border-theme ink-primary hover:border-[var(--brand-brass)] flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Bookmark className="w-3.5 h-3.5 ink-brass fill-current" />
+                  <span>Ayat {savedLastRead.ayat}</span>
+                </button>
+              )}
+            </div>
 
+            {isSearchFocused &&
+              searchQuery.trim().length > 0 &&
+              (() => {
+                const localResults = executeLocalSmartSearch(searchQuery, surat);
                 return (
-                  <div className="absolute top-full left-0 right-0 mt-2 z-40 bg-white rounded-2xl border border-stone-200 shadow-2xl p-2.5 space-y-2 animate-fade-in-up max-h-[28rem] overflow-y-auto">
-                    <div className="flex items-center justify-between px-2 pb-1.5 border-b border-stone-100">
-                      <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                        Hasil Pencarian Cerdas
+                  <div className="absolute top-full left-0 right-0 mt-2 z-40 surface-card rounded-2xl border border-theme shadow-2xl p-3 space-y-2.5 max-h-[26rem] overflow-y-auto custom-scroll">
+                    <div className="flex items-center justify-between px-1 pb-1.5 border-b border-theme">
+                      <span className="text-[11px] font-semibold ink-muted uppercase tracking-wider">
+                        Temuan Ayat &amp; Topik
                       </span>
                       <button
+                        type="button"
                         onClick={() => setIsSearchFocused(false)}
-                        className="text-stone-400 hover:text-stone-600 text-xs font-semibold cursor-pointer"
+                        className="text-xs ink-muted hover:ink-primary cursor-pointer"
                       >
                         Tutup
                       </button>
                     </div>
 
-                    {/* 1. Hasil Pola Surat & Ayat (Contoh: "nisa 136", "4:136", "136") */}
-                    {hasPattern && (
-                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                            {localResults.patternResult.nomorAyat}
-                          </div>
-                          <div>
-                            <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
-                              {localResults.patternResult.label}
-                            </h4>
-                            <p className="text-[11px] text-emerald-800">
-                              {localResults.patternResult.isCurrentSurat
-                                ? "Lompat langsung ke ayat ini di halaman ini"
-                                : `Buka Surat ${localResults.patternResult.suratNamaLatin}`}
-                            </p>
-                          </div>
+                    {localResults.patternResult && (
+                      <div className="p-2.5 rounded-xl surface-accent-soft border border-emerald-700/25 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs sm:text-sm font-semibold ink-primary">
+                            {localResults.patternResult.label}
+                          </p>
+                          <p className="text-[11px] ink-muted">
+                            {localResults.patternResult.isCurrentSurat
+                              ? "Lompat langsung di halaman ini"
+                              : `Buka QS. ${localResults.patternResult.suratNamaLatin}`}
+                          </p>
                         </div>
                         <button
+                          type="button"
                           onClick={() => handleSearchSelect(localResults.patternResult)}
-                          className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer"
+                          className="px-3 py-1.5 bg-[#1B4332] text-white rounded-lg text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
                         >
                           <span>Lompat</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />
@@ -629,100 +798,81 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                       </div>
                     )}
 
-                    {/* 2. Hasil Tematik (Contoh: "100 dinar", "hutang", "jodoh", "ayat kursi") */}
-                    {hasThematic && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-amber-900">
-                          <Compass className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Topik Tematik Terkurasi</span>
-                        </div>
-                        {localResults.thematicResults.map((t) => (
-                          <div
-                            key={t.id}
-                            onClick={() => handleSearchSelect(t)}
-                            className="p-2.5 rounded-xl bg-amber-50/60 hover:bg-amber-100/70 border border-amber-200/60 cursor-pointer transition-colors flex items-start justify-between gap-2"
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-xs text-stone-900">{t.title}</span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-200/70 text-amber-900 font-semibold">
-                                  QS. {t.suratNamaLatin} : {t.ayatRange}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-stone-600 mt-0.5 line-clamp-2 leading-relaxed">
-                                {t.description}
-                              </p>
-                            </div>
-                            <ArrowUpRight className="w-4 h-4 text-amber-700 shrink-0 mt-1" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 3. Hasil Surat Saja (jika mengetik nama surat) */}
-                    {hasSurah && (
-                      <div className="space-y-1">
-                        <span className="text-[11px] font-semibold text-stone-500 px-2">Pilihan Surat:</span>
-                        {localResults.surahResults.map((s) => (
-                          <div
-                            key={s.nomor}
-                            onClick={() => router.push(`/surat/${s.nomor}`)}
-                            className="p-2 rounded-xl hover:bg-stone-50 flex items-center justify-between cursor-pointer border border-transparent hover:border-stone-200"
-                          >
-                            <span className="text-xs font-semibold text-stone-800">
-                              {s.nomor}. {s.namaLatin} ({s.jumlahAyat} Ayat)
-                            </span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-stone-400" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 4. Rekomendasi Hasil AI (Jika ada) */}
-                    {hasAi && (
-                      <div className="space-y-1.5 pt-1 border-t border-stone-100">
-                        <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-emerald-900">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Hasil Rekomendasi AI</span>
-                        </div>
-                        {aiSearchResults.map((aiItem, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => handleSearchSelect(aiItem)}
-                            className="p-2.5 rounded-xl bg-[#F0F7F4] hover:bg-[#E2F0EA] border border-[#A3CFBB]/60 cursor-pointer transition-colors space-y-1"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-emerald-950">
-                                QS. {aiItem.suratNamaLatin} : Ayat {aiItem.nomorAyat}
-                              </span>
-                              <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-semibold">
-                                {aiItem.judulTopik || "AI Match"}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-stone-600 line-clamp-2">
-                              {aiItem.alasanRelevansi}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 5. Tombol Panggil AI jika kueri bebas */}
-                    <div className="pt-1.5 border-t border-stone-100">
+                    {localResults.thematicResults.map((t) => (
                       <button
-                        onClick={handleTriggerAiSearch}
-                        disabled={isLoadingAi}
-                        className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-800 to-teal-800 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+                        key={t.id}
+                        type="button"
+                        onClick={() => handleSearchSelect(t)}
+                        className="w-full text-left p-2.5 rounded-xl surface-elevated hover:border-[var(--brand-brass)] border border-theme transition-colors flex items-start justify-between gap-2 cursor-pointer"
                       >
-                        {isLoadingAi ? (
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-xs ink-primary">{t.title}</span>
+                            <span className="text-[10px] ink-brass font-medium">
+                              QS. {t.suratNamaLatin} : {t.ayatRange}
+                            </span>
+                          </div>
+                          <p className="text-[11px] ink-secondary mt-0.5 line-clamp-2">
+                            {t.description}
+                          </p>
+                        </div>
+                        <ArrowUpRight className="w-4 h-4 ink-muted shrink-0 mt-0.5" />
+                      </button>
+                    ))}
+
+                    {localResults.surahResults.map((s) => (
+                      <button
+                        key={s.nomor}
+                        type="button"
+                        onClick={() => router.push(`/surat/${s.nomor}`)}
+                        className="w-full p-2 rounded-xl hover:surface-elevated flex items-center justify-between text-xs font-medium ink-primary cursor-pointer"
+                      >
+                        <span>
+                          {s.nomor}. {s.namaLatin} ({s.jumlahAyat} Ayat)
+                        </span>
+                        <ArrowUpRight className="w-3.5 h-3.5 ink-muted" />
+                      </button>
+                    ))}
+
+                    {contextSearchResults.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t border-theme">
+                        <span className="text-[11px] font-semibold ink-muted px-1">
+                          Rujukan Kontekstual
+                        </span>
+                        {contextSearchResults.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSearchSelect(item)}
+                            className="w-full text-left p-2.5 rounded-xl surface-accent-soft border border-emerald-700/20 space-y-0.5 cursor-pointer"
+                          >
+                            <p className="font-semibold text-xs ink-primary">
+                              QS. {item.suratNamaLatin} : Ayat {item.nomorAyat} — {item.judulTopik}
+                            </p>
+                            <p className="text-[11px] ink-secondary line-clamp-2">
+                              {item.alasanRelevansi}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="pt-1.5 border-t border-theme">
+                      <button
+                        type="button"
+                        onClick={handleContextualSearch}
+                        disabled={isLoadingContextSearch}
+                        className="w-full py-2 px-3 rounded-xl bg-[#1B4332] hover:bg-[#245640] text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      >
+                        {isLoadingContextSearch ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Mencari makna dengan AI...</span>
+                            <span>Menelusuri rujukan ayat...</span>
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
-                            <span>Tanya AI Ayat untuk &quot;{searchQuery}&quot;</span>
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>Cari rujukan ayat tentang &quot;{searchQuery}&quot;</span>
                           </>
                         )}
                       </button>
@@ -730,428 +880,359 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
                   </div>
                 );
               })()}
-            </div>
+          </div>
+        )}
 
-            {/* Reading Options Bar */}
-            <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-stone-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              {/* Font size adjustment */}
-              <div className="flex items-center justify-between sm:justify-start gap-2">
-                <span className="text-stone-500 font-medium">Ukuran Teks Arab:</span>
-                <div className="flex items-center rounded-lg border border-stone-200 p-0.5 bg-stone-50">
-                  <button
-                    onClick={() => setArabicFontSize("small")}
-                    className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                      arabicFontSize === "small" ? "bg-white text-emerald-900 shadow-xs" : "text-stone-600"
-                    }`}
-                  >
-                    A
-                  </button>
-                  <button
-                    onClick={() => setArabicFontSize("normal")}
-                    className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                      arabicFontSize === "normal" ? "bg-white text-emerald-900 shadow-xs" : "text-stone-600"
-                    }`}
-                  >
-                    A+
-                  </button>
-                  <button
-                    onClick={() => setArabicFontSize("large")}
-                    className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                      arabicFontSize === "large" ? "bg-white text-emerald-900 shadow-xs" : "text-stone-600"
-                    }`}
-                  >
-                    A++
-                  </button>
-                </div>
-              </div>
-
-              {/* Toggles grid in mobile */}
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
-                <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
-                  <input
-                    type="checkbox"
-                    checked={autoScrollEnabled}
-                    onChange={(e) => setAutoScrollEnabled(e.target.checked)}
-                    className="accent-emerald-700 rounded"
-                  />
-                  <span className="truncate">Auto-scroll</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
-                  <input
-                    type="checkbox"
-                    checked={autoNextSurat}
-                    onChange={(e) => handleToggleAutoNext(e.target.checked)}
-                    className="accent-emerald-700 rounded"
-                  />
-                  <span className="truncate">Auto-Next Surat</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
-                  <input
-                    type="checkbox"
-                    checked={showLatin}
-                    onChange={(e) => setShowLatin(e.target.checked)}
-                    className="accent-emerald-700 rounded"
-                  />
-                  <span>Latin</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-stone-600 select-none">
-                  <input
-                    type="checkbox"
-                    checked={showTranslation}
-                    onChange={(e) => setShowTranslation(e.target.checked)}
-                    className="accent-emerald-700 rounded"
-                  />
-                  <span>Arti</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Bismillah Header */}
+        {/* ============================================================
+            MODE 1: TILAWAH (PER-AYAT)
+           ============================================================ */}
+        {activeMode === "read" && (
+          <div className="space-y-4">
             {isBismillahShown && (
-              <div className="text-center py-6 bg-[#F0F7F4] rounded-3xl border border-[#A3CFBB]/40">
-                <p className="font-arabic text-3xl sm:text-4xl text-emerald-950 font-bold">
+              <div className="text-center py-6 px-4 surface-card rounded-3xl border border-theme">
+                <p className="font-arabic text-3xl sm:text-4xl ink-arabic text-center">
                   بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ
                 </p>
-                <p className="text-xs text-emerald-900/80 mt-2 italic">
+                <p className="text-xs ink-muted mt-1.5 italic">
                   Dengan nama Allah Yang Maha Pengasih lagi Maha Penyayang
                 </p>
               </div>
             )}
 
-            {/* List of Verses */}
-            <div className="space-y-4">
-              {surat.ayat.map((ayat) => {
+            <div className="space-y-3.5">
+              {surat.ayat.map((ayat, idx) => {
                 const isPlayingThis =
                   currentTrack?.ayatNomor === ayat.nomorAyat &&
                   currentTrack?.title.includes(surat.namaLatin);
-                const isBookmarked =
+                const isLastRead =
                   savedLastRead?.nomor === surat.nomor && savedLastRead?.ayat === ayat.nomorAyat;
+                const isFavorited = bookmarkedSet.has(`${surat.nomor}:${ayat.nomorAyat}`);
+                const hasNote = notedSet.has(`${surat.nomor}:${ayat.nomorAyat}`);
 
                 return (
-                  <div
+                  <article
                     key={ayat.nomorAyat}
                     id={`ayat-${ayat.nomorAyat}`}
-                    className={`rounded-2xl border transition-all duration-300 p-3.5 sm:p-5 ${
-                      activeJumpAyat === ayat.nomorAyat ? "ayat-jump-highlight" : ""
-                    } ${
+                    className={`surface-card rounded-2xl border transition-colors p-4 sm:p-6 ${
+                      idx >= 6 ? "verse-deferred" : ""
+                    } ${activeJumpAyat === ayat.nomorAyat ? "ayat-jump-highlight" : ""} ${
                       isPlayingThis
                         ? "ayat-active-reciting"
-                        : isBookmarked
-                        ? "bg-[#F9F6F0] border-[#B38F5C]/40"
-                        : "bg-white border-stone-200 hover:border-stone-300"
+                        : isLastRead
+                        ? "surface-brass-soft border-[#9A7B4F]/50"
+                        : "border-theme"
                     }`}
                   >
-                    {/* Verse Toolbar */}
-                    <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-stone-100 gap-2">
-                      <div className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
+                    {/* Verse Action Strip */}
+                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-theme gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border ${
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-semibold text-xs shrink-0 border tabular-nums ${
                             isPlayingThis
-                              ? "bg-emerald-800 text-white border-emerald-800"
-                              : "bg-stone-100 text-stone-700 border-stone-200/60"
+                              ? "bg-[#1B4332] text-white border-[#1B4332]"
+                              : "surface-elevated ink-primary border-theme"
                           }`}
                         >
                           {ayat.nomorAyat}
                         </span>
 
                         {isPlayingThis && (
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-900 text-[11px] font-semibold">
-                            <div className="flex items-center gap-0.5 h-3">
-                              <span className="w-0.5 h-2.5 bg-emerald-800 rounded audio-bar-1 inline-block"></span>
-                              <span className="w-0.5 h-3.5 bg-emerald-800 rounded audio-bar-2 inline-block"></span>
-                              <span className="w-0.5 h-2 bg-emerald-800 rounded audio-bar-3 inline-block"></span>
-                            </div>
-                            <span>Sedang Dilantunkan</span>
-                          </div>
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                            <span className="flex items-center gap-0.5 h-3">
+                              <span className="w-0.5 h-2 bg-current rounded audio-bar-1 inline-block" />
+                              <span className="w-0.5 h-3 bg-current rounded audio-bar-2 inline-block" />
+                              <span className="w-0.5 h-1.5 bg-current rounded audio-bar-3 inline-block" />
+                            </span>
+                            <span className="hidden sm:inline">Dilantunkan</span>
+                          </span>
                         )}
 
-                        {isBookmarked && !isPlayingThis && (
-                          <span className="text-[11px] font-semibold text-stone-700 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                            <Bookmark className="w-3 h-3 text-stone-600" />
-                            <span>Terakhir Dibaca</span>
+                        {isLastRead && !isPlayingThis && (
+                          <span className="text-[11px] font-medium ink-brass truncate">
+                            Terakhir dibaca
                           </span>
                         )}
                       </div>
 
-                      {/* Action buttons */}
                       <div className="flex items-center gap-1">
                         <button
+                          type="button"
                           onClick={() => handleVerseAudioClick(ayat)}
-                          className={`px-2.5 py-1.5 rounded-xl text-xs transition-colors flex items-center gap-1 border ${
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors inline-flex items-center gap-1 border cursor-pointer ${
                             isPlayingThis
-                              ? isPlayingAudio
-                                ? "bg-emerald-800 text-white border-emerald-800 font-semibold"
-                                : "bg-emerald-700/80 text-white border-emerald-700 font-semibold"
-                              : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                              ? "bg-[#1B4332] text-white border-[#1B4332]"
+                              : "surface-elevated border-theme ink-primary hover:border-[var(--border-strong)]"
                           }`}
-                          title={
-                            isPlayingThis
-                              ? isPlayingAudio
-                                ? "Jeda Audio"
-                                : "Lanjutkan Audio"
-                              : "Dengar Ayat Ini"
-                          }
+                          title={isPlayingThis && isPlayingAudio ? "Jeda Audio" : "Putar Ayat"}
                         >
-                          {isPlayingThis ? (
-                            isPlayingAudio ? (
-                              <>
-                                <Pause className="w-3.5 h-3.5" />
-                                <span>Jeda</span>
-                              </>
-                            ) : (
-                              <>
-                                <Play className="w-3.5 h-3.5" />
-                                <span>Lanjut</span>
-                              </>
-                            )
+                          {isPlayingThis && isPlayingAudio ? (
+                            <>
+                              <Pause className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Jeda</span>
+                            </>
                           ) : (
                             <>
                               <Play className="w-3.5 h-3.5" />
-                              <span>Audio</span>
+                              <span className="hidden sm:inline">Dengar</span>
                             </>
                           )}
                         </button>
 
                         <button
-                          onClick={() => saveAsLastRead(ayat)}
-                          className={`p-2 rounded-xl transition-all border cursor-pointer ${
-                            isBookmarked
-                              ? "bg-amber-100 text-amber-900 border-amber-300 shadow-2xs"
-                              : "bg-stone-50 hover:bg-stone-100 text-stone-500 hover:text-stone-800 border-stone-200"
+                          type="button"
+                          onClick={() => handleMarkLastRead(ayat)}
+                          className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                            isLastRead
+                              ? "surface-brass-soft border-[#9A7B4F] ink-brass"
+                              : "surface-elevated border-theme ink-muted hover:ink-primary"
                           }`}
-                          title={isBookmarked ? "Tanda Bacaan Terakhir Aktif" : "Tandai Sebagai Bacaan Terakhir"}
+                          title="Tandai sebagai bacaan terakhir"
+                          aria-label="Tandai sebagai bacaan terakhir"
                         >
-                          <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? "fill-amber-500 text-amber-700" : ""}`} />
+                          <Bookmark className={`w-3.5 h-3.5 ${isLastRead ? "fill-current" : ""}`} />
                         </button>
 
                         <button
-                          onClick={() => openReflection(ayat)}
-                          className="px-2.5 py-1.5 rounded-xl bg-[#F0F7F4] text-emerald-900 hover:bg-[#E2F0EA] font-semibold transition-colors text-xs flex items-center gap-1 border border-[#A3CFBB]/40"
-                          title="Buka AI Tadabbur & Tafsir"
+                          type="button"
+                          onClick={() => handleToggleFavorite(ayat)}
+                          className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                            isFavorited
+                              ? "surface-accent-soft border-emerald-700/40 text-emerald-700 dark:text-emerald-300"
+                              : "surface-elevated border-theme ink-muted hover:ink-primary"
+                          }`}
+                          title={isFavorited ? "Tersimpan di Koleksi" : "Simpan ke Koleksi"}
+                          aria-label={isFavorited ? "Hapus dari Koleksi" : "Simpan ke Koleksi"}
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-800" />
-                          <span className="hidden sm:inline">Tadabbur</span>
+                          <BookMarked
+                            className={`w-3.5 h-3.5 ${isFavorited ? "fill-current" : ""}`}
+                          />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openStoryModal(ayat)}
+                          className="p-2 rounded-xl surface-elevated border border-theme ink-muted hover:ink-primary transition-colors cursor-pointer"
+                          title="Buat Kartu Ayat (9:16)"
+                          aria-label="Buat Kartu Ayat"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openReflection(ayat)}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                            hasNote
+                              ? "surface-accent-soft border-emerald-700/40 text-emerald-800 dark:text-emerald-300"
+                              : "surface-elevated border-theme ink-primary hover:border-[var(--border-strong)]"
+                          }`}
+                          title="Buka Tafsir Kemenag & Catatan Hati"
+                        >
+                          <ScrollText className="w-3.5 h-3.5 text-emerald-700" />
+                          <span className="hidden sm:inline">
+                            {hasNote ? "Tafsir •" : "Tafsir"}
+                          </span>
                         </button>
                       </div>
                     </div>
 
-                    {/* Arabic Text (BOLD when reciting) */}
-                    <div className="mb-4">
-                      <p
-                        className={`font-arabic text-right transition-all duration-200 ${getFontSizeClass()} ${
-                          isPlayingThis
-                            ? "font-bold text-[#0D281E] scale-[1.01]"
-                            : "font-semibold text-stone-900"
-                        }`}
-                      >
-                        {ayat.teksArab}
-                      </p>
-                    </div>
+                    {/* Crisp Regular-Weight Arabic Verse + Authentic End Marker */}
+                    <p className={`font-arabic ink-arabic mb-5 ${getFontSizeClass()}`}>
+                      {ayat.teksArab}
+                      <span className="ayat-end-ornament">{formatAyatMarker(ayat.nomorAyat)}</span>
+                    </p>
 
                     {/* Latin & Translation */}
-                    <div className="space-y-1.5 pt-2 border-t border-stone-100">
-                      {showLatin && ayat.teksLatin && (
-                        <p className="text-xs sm:text-sm text-emerald-950/80 font-medium italic">
-                          {ayat.teksLatin}
-                        </p>
-                      )}
-                      {showTranslation && (
-                        <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
-                          {ayat.teksIndonesia}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                    {(showLatin || showTranslation) && (
+                      <div className="space-y-1.5 pt-3 border-t border-theme">
+                        {showLatin && ayat.teksLatin && (
+                          <p className="text-xs sm:text-sm ink-brass italic leading-relaxed">
+                            {ayat.teksLatin}
+                          </p>
+                        )}
+                        {showTranslation && (
+                          <p className="text-xs sm:text-[15px] ink-secondary leading-relaxed">
+                            {ayat.teksIndonesia}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </article>
                 );
               })}
             </div>
           </div>
         )}
 
-        {/* TAB 2: LISTEN (Murattal Player) */}
-        {activeTab === "listen" && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-100">
-                <div>
-                  <h3 className="font-bold text-stone-900 text-lg">Pilihan Qari</h3>
-                  <p className="text-xs text-stone-500">
-                    Dengarkan lantunan ayat suci Al-Qur&apos;an dalam kualitas jernih
-                  </p>
-                </div>
-                <select
-                  value={reciterKey}
-                  onChange={(e) => setReciterKey(e.target.value)}
-                  className="bg-stone-50 border border-stone-300 rounded-xl px-3 py-2 text-sm text-stone-800 font-medium focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700"
-                >
-                  {Object.entries(RECITERS).map(([key, val]) => (
-                    <option key={key} value={key}>
-                      {val.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Full Surah Audio Card */}
-              <div className="p-4 rounded-2xl bg-[#F0F7F4] border border-[#A3CFBB]/40 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-800 text-white flex items-center justify-center shadow-xs">
-                    <Headphones className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-stone-900 text-sm sm:text-base">
-                      Putar Lengkap 1 Surat (Sinkron Ayat)
-                    </h4>
-                    <p className="text-xs text-stone-500">
-                      {RECITERS[reciterKey]?.name} • QS. {surat.namaLatin}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={playSuratSequential}
-                  className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Mulai Putar</span>
-                </button>
-              </div>
-
-              {/* Per-Ayat Audio Playlist */}
-              <div>
-                <h4 className="font-bold text-stone-800 text-sm mb-3">Playlist Ayat:</h4>
-                <div className="divide-y divide-stone-100 max-h-96 overflow-y-auto pr-1">
-                  {surat.ayat.map((ayat) => {
-                    const isPlayingThis =
-                      currentTrack?.ayatNomor === ayat.nomorAyat &&
-                      currentTrack?.title.includes(surat.namaLatin);
-
-                    return (
-                      <div
-                        key={ayat.nomorAyat}
-                        className={`py-3 px-2.5 flex items-center justify-between gap-3 transition-colors rounded-xl ${
-                          isPlayingThis ? "bg-[#F0F7F4] border border-[#A3CFBB]/60" : "hover:bg-stone-50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 truncate">
-                          <span
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs border ${
-                              isPlayingThis
-                                ? "bg-emerald-800 text-white border-emerald-800"
-                                : "bg-stone-100 text-stone-700 border-stone-200/60"
-                            }`}
-                          >
-                            {ayat.nomorAyat}
-                          </span>
-                          <div className="truncate">
-                            <p className="text-xs font-semibold text-stone-900 truncate">
-                              Ayat ke-{ayat.nomorAyat}
-                            </p>
-                            <p className="text-[11px] text-stone-500 truncate">{ayat.teksIndonesia}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleVerseAudioClick(ayat)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
-                              isPlayingThis
-                                ? isPlayingAudio
-                                  ? "bg-emerald-800 text-white border-emerald-800"
-                                  : "bg-emerald-700/80 text-white border-emerald-700"
-                                : "bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-200/60"
-                            }`}
-                          >
-                            {isPlayingThis ? (
-                              isPlayingAudio ? (
-                                <>
-                                  <Pause className="w-3 h-3" />
-                                  <span>Jeda</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="w-3 h-3" />
-                                  <span>Lanjut</span>
-                                </>
-                              )
-                            ) : (
-                              <>
-                                <Play className="w-3 h-3" />
-                                <span>Putar</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+        {/* ============================================================
+            MODE 2: MUSHAF FOKUS (CONTINUOUS FLOWING READING)
+           ============================================================ */}
+        {activeMode === "mushaf" && (
+          <section
+            aria-label="Mode Mushaf Fokus"
+            className="surface-card rounded-3xl p-5 sm:p-10 border border-theme space-y-6"
+          >
+            <div className="text-center pb-5 border-b border-theme space-y-2">
+              <p className="text-[11px] uppercase tracking-widest ink-muted">
+                Ketuk ayat mana pun untuk melihat arti, audio, atau tafsir
+              </p>
+              {isBismillahShown && (
+                <p className="font-arabic text-3xl sm:text-4xl ink-arabic text-center pt-2">
+                  بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ
+                </p>
+              )}
             </div>
-          </div>
+
+            <div className={`mushaf-flow ink-arabic ${getFontSizeClass()}`}>
+              {surat.ayat.map((ayat) => {
+                const isSelected = mushafSelectedAyat?.nomorAyat === ayat.nomorAyat;
+                const isPlayingThis =
+                  currentTrack?.ayatNomor === ayat.nomorAyat &&
+                  currentTrack?.title.includes(surat.namaLatin);
+
+                return (
+                  <span
+                    key={ayat.nomorAyat}
+                    id={`ayat-${ayat.nomorAyat}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setMushafSelectedAyat(isSelected ? null : ayat)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setMushafSelectedAyat(isSelected ? null : ayat);
+                      }
+                    }}
+                    className={`inline rounded-lg px-1 transition-colors cursor-pointer ${
+                      isPlayingThis
+                        ? "surface-accent-soft text-emerald-800 dark:text-emerald-200"
+                        : isSelected
+                        ? "surface-brass-soft"
+                        : "hover:bg-black/5"
+                    }`}
+                  >
+                    {ayat.teksArab}
+                    <span className="ayat-end-ornament">{formatAyatMarker(ayat.nomorAyat)}</span>{" "}
+                  </span>
+                );
+              })}
+            </div>
+          </section>
         )}
 
-        {/* TAB 3: MEMORIZE (Hafalan Mode) */}
-        {activeTab === "memorize" && (
+        {/* ============================================================
+            MODE 3: MURAJA'AH (HAFALAN AKTIF)
+           ============================================================ */}
+        {activeMode === "memorize" && (
           <MemorizeMode
             surat={surat}
             onPlayAyat={playAyat}
+            onStartRangeLoop={handleStartRangeLoop}
+            activeLoopRange={loopRange}
+            onClearRangeLoop={() => setLoopRange(null)}
             onOpenReflection={openReflection}
           />
         )}
 
-        {/* TAB 4: REFLECT (AI Tadabbur) */}
-        {activeTab === "reflect" && (
-          <div className="space-y-4">
-            <div className="bg-[#1B4332] text-stone-100 rounded-3xl p-6 shadow-sm border border-stone-700/30">
-              <span className="text-emerald-200 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                AI Tadabbur & Refleksi
-              </span>
-              <h3 className="text-2xl font-bold mt-1 text-white">Renungi Hikmah Setiap Ayat</h3>
-              <p className="text-xs sm:text-sm text-stone-200 mt-1 max-w-xl leading-relaxed">
-                Pilih ayat dari surat {surat.namaLatin} untuk membuka tadabbur mendalam berbasis Tafsir
-                Kemenag dan hikmah kehidupan nyata.
-              </p>
-            </div>
+        {/* Bottom Surah Navigation */}
+        <div className="flex items-center justify-between gap-3 pt-4">
+          {surat.suratSebelumnya ? (
+            <Link
+              href={`/surat/${surat.suratSebelumnya.nomor}`}
+              className="flex-1 sm:flex-none px-4 py-3 rounded-2xl surface-card border border-theme hover:border-[var(--brand-brass)] transition-colors flex items-center gap-2 text-xs"
+            >
+              <ChevronLeft className="w-4 h-4 ink-muted shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] ink-muted block">Sebelumnya</span>
+                <span className="font-semibold ink-primary truncate block">
+                  {surat.suratSebelumnya.namaLatin}
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <span />
+          )}
 
-            <div className="grid sm:grid-cols-2 gap-3">
-              {surat.ayat.map((ayat) => (
-                <div
-                  key={ayat.nomorAyat}
-                  className="bg-white rounded-2xl border border-stone-200 p-4 hover:border-emerald-700/40 hover:shadow-sm transition-all flex flex-col justify-between space-y-3"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="w-7 h-7 rounded-lg bg-stone-100 text-stone-700 font-bold text-xs flex items-center justify-center border border-stone-200/60">
-                        {ayat.nomorAyat}
-                      </span>
-                      <span className="font-arabic text-xl font-bold text-emerald-950">
-                        {ayat.teksArab.substring(0, 30)}...
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                      &quot;{ayat.teksIndonesia}&quot;
-                    </p>
-                  </div>
+          {surat.suratSelanjutnya && (
+            <Link
+              href={`/surat/${surat.suratSelanjutnya.nomor}`}
+              className="flex-1 sm:flex-none px-4 py-3 rounded-2xl surface-card border border-theme hover:border-[var(--brand-brass)] transition-colors flex items-center justify-end gap-2 text-xs text-right"
+            >
+              <div className="min-w-0">
+                <span className="text-[10px] ink-muted block">Selanjutnya</span>
+                <span className="font-semibold ink-primary truncate block">
+                  {surat.suratSelanjutnya.namaLatin}
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 ink-muted shrink-0" />
+            </Link>
+          )}
+        </div>
 
-                  <button
-                    onClick={() => openReflection(ayat)}
-                    className="w-full py-2 rounded-xl bg-[#F0F7F4] hover:bg-[#E2F0EA] text-emerald-950 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border border-[#A3CFBB]/40"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-800" />
-                    <span>Buka Refleksi AI & Tafsir</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Footer: Pengenalan Dev, API Attribution & Buy Me a Coffee */}
-        <Footer />
+        <Footer compact />
       </main>
 
-      {/* Floating Sticky Audio Player Bar */}
+      {/* Mushaf Tap-to-Inspect Calm Floating Sheet */}
+      {activeMode === "mushaf" && mushafSelectedAyat && (
+        <div
+          className={`fixed left-3 right-3 z-40 max-w-2xl mx-auto surface-card border border-theme rounded-2xl p-4 shadow-2xl animate-fade-in-up ${
+            currentTrack ? "bottom-44 md:bottom-36" : "bottom-[72px] md:bottom-6"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <span className="text-xs font-semibold ink-brass">
+              QS. {surat.namaLatin} : Ayat {mushafSelectedAyat.nomorAyat}
+            </span>
+            <button
+              type="button"
+              onClick={() => setMushafSelectedAyat(null)}
+              aria-label="Tutup pratinjau ayat"
+              className="ink-muted hover:ink-primary p-0.5 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs sm:text-sm ink-secondary leading-relaxed mb-3">
+            &quot;{mushafSelectedAyat.teksIndonesia}&quot;
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleVerseAudioClick(mushafSelectedAyat)}
+              className="px-3 py-1.5 rounded-xl bg-[#1B4332] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Dengar Ayat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleMarkLastRead(mushafSelectedAyat)}
+              className="px-3 py-1.5 rounded-xl surface-elevated border border-theme ink-primary text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Bookmark className="w-3.5 h-3.5 ink-brass" />
+              <span>Tandai Terakhir</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openReflection(mushafSelectedAyat)}
+              className="px-3 py-1.5 rounded-xl surface-elevated border border-theme ink-primary text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <ScrollText className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Tafsir &amp; Catatan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openStoryModal(mushafSelectedAyat)}
+              className="px-3 py-1.5 rounded-xl surface-elevated border border-theme ink-primary text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5 ink-muted" />
+              <span>Kartu Ayat</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Audio Player Bar */}
       <AudioPlayerBar
         currentTrack={currentTrack}
         playlist={surat.ayat}
@@ -1161,6 +1242,7 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
           setCurrentTrack(null);
           setActiveAyatIndex(null);
           setIsPlayingAudio(false);
+          setLoopRange(null);
         }}
         reciterKey={reciterKey}
         setReciterKey={(newReciter) => {
@@ -1174,7 +1256,9 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
         }}
         repeatCount={repeatCount}
         setRepeatCount={setRepeatCount}
-        onPlayStateChange={handlePlayStateChange}
+        loopRange={loopRange}
+        onClearLoopRange={() => setLoopRange(null)}
+        onPlayStateChange={setIsPlayingAudio}
         toggleRef={audioToggleRef}
         isZenOpenExternal={isZenOpen}
         setIsZenOpenExternal={setIsZenOpen}
@@ -1183,71 +1267,89 @@ export default function SuratDetailView({ surat, tafsirData, initialMode = "read
         onPrev={surat?.suratSebelumnya?.nomor ? handlePrevSurat : null}
       />
 
-      {/* Floating Transition Indicator */}
       {transitioningToNext && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-emerald-950/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-emerald-700/80 text-xs font-semibold flex items-center gap-2.5 animate-pulse">
-          <Headphones className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>Melanjutkan lantunan ke QS. {transitioningToNext}...</span>
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[#161E1B]/95 text-stone-100 backdrop-blur-md px-4 py-2 rounded-xl shadow-xl border border-white/15 text-xs font-medium flex items-center gap-2">
+          <Headphones className="w-3.5 h-3.5 text-emerald-300" />
+          <span>Melanjutkan ke QS. {transitioningToNext}...</span>
         </div>
       )}
 
-      {/* Tadabbur AI Reflection Modal */}
       <ReflectionModal
         isOpen={isReflectionModalOpen}
         onClose={() => setIsReflectionModalOpen(false)}
         ayatData={selectedAyatForReflection}
       />
 
-      {/* Bottom Navigation for Mobile Device */}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <VerseStoryModal
+        isOpen={isStoryModalOpen}
+        onClose={() => setIsStoryModalOpen(false)}
+        verseData={storyVerseData}
+      />
 
-      {/* Confirmation Modal: Kembali ke Beranda */}
-      {isBackConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-sm animate-fade-in-up">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full border border-stone-200 shadow-2xl space-y-4 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-sm">
-              <Headphones className="w-6 h-6 animate-pulse" />
-            </div>
+      <BottomNav
+        activeTab={activeMode}
+        setActiveTab={handleBottomTabClick}
+        items={detailBottomTabs}
+      />
 
-            <div className="space-y-1.5">
-              <h3 className="font-bold text-lg text-stone-900">Audio Masih Diputar</h3>
-              <p className="text-xs text-stone-500 leading-relaxed">
-                Lantunan <span className="font-semibold text-stone-800">{currentTrack?.title || "Al-Qur'an"}</span> sedang aktif. Ingin tetap mendengarkan di beranda atau menghentikannya?
-              </p>
-            </div>
+      {/* Native <dialog> Confirmation when navigating Home during active playback */}
+      <dialog
+        ref={backConfirmDialogRef}
+        closedby="any"
+        aria-labelledby="back-audio-confirm-title"
+        className="app-modal p-4 w-full max-w-sm"
+      >
+        <div className="surface-card rounded-3xl p-6 w-full border border-theme shadow-2xl space-y-4 text-center">
+          <div className="w-11 h-11 rounded-2xl surface-accent-soft text-emerald-700 flex items-center justify-center mx-auto">
+            <Headphones className="w-5 h-5" />
+          </div>
 
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={handleContinuePlaybackHome}
-                className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Tetap Lanjutkan di Beranda</span>
-              </button>
+          <div className="space-y-1.5">
+            <h2
+              id="back-audio-confirm-title"
+              className="font-editorial font-semibold text-lg ink-primary"
+            >
+              Murattal Sedang Diputar
+            </h2>
+            <p className="text-xs ink-secondary leading-relaxed">
+              Lantunan <strong>{currentTrack?.title || "Al-Qur'an"}</strong> masih aktif. Lanjutkan
+              audio di beranda atau hentikan?
+            </p>
+          </div>
 
-              <button
-                onClick={handleStopAndGoHome}
-                className="w-full py-2.5 px-4 bg-stone-100 hover:bg-red-50 text-stone-700 hover:text-red-700 text-xs font-semibold rounded-xl transition-colors border border-stone-200 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Hentikan Audio</span>
-              </button>
-
-              <button
-                onClick={() => setIsBackConfirmOpen(false)}
-                className="w-full py-2 text-xs text-stone-400 hover:text-stone-600 font-medium transition-colors cursor-pointer"
-              >
-                Batal (Tetap di Surat Ini)
-              </button>
-            </div>
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              onClick={handleContinuePlaybackHome}
+              className="w-full py-2.5 px-4 bg-[#1B4332] hover:bg-[#245640] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+            >
+              Tetap Putar di Beranda
+            </button>
+            <button
+              type="button"
+              onClick={handleStopAndGoHome}
+              className="w-full py-2.5 px-4 surface-elevated hover:text-red-600 ink-primary text-xs font-medium rounded-xl border border-theme transition-colors cursor-pointer"
+            >
+              Hentikan &amp; Kembali
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBackConfirmOpen(false)}
+              className="w-full py-1.5 text-xs ink-muted hover:ink-primary cursor-pointer"
+            >
+              Batal
+            </button>
           </div>
         </div>
-      )}
+      </dialog>
 
-      {/* Toast Notification */}
+      {/* Calm Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 bg-stone-900/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl border border-stone-700 text-xs font-semibold flex items-center gap-2 animate-fade-in-up">
-          <Bookmark className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
-          <span>{toastMessage}</span>
+        <div
+          role="status"
+          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 bg-[#161E1B]/95 text-stone-100 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-xl border border-white/10 text-xs font-medium animate-fade-in-up"
+        >
+          {toastMessage}
         </div>
       )}
     </div>
