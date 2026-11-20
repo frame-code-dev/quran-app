@@ -3,106 +3,113 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, Headphones, Brain, Sparkles } from "lucide-react";
+import { Headphones, BookmarkCheck } from "lucide-react";
 
-export default function SuratCard({ surat, onQuickAction }) {
+export default function SuratCard({ surat, onQuickAction, memorizeStats }) {
   const router = useRouter();
-  const isMekah = surat.tempatTurun?.toLowerCase() === "mekah";
 
   const handleCardClick = (e) => {
-    // If clicked inside interactive buttons or action links, let them handle it
     if (e.target.closest("button, a")) return;
     router.push(`/surat/${surat.nomor}`);
   };
 
+  const mutqin = memorizeStats?.mutqin || 0;
+  const proses = memorizeStats?.proses || 0;
+  const hasProgress = mutqin > 0 || proses > 0;
+  const mutqinPct = hasProgress ? Math.round((mutqin / surat.jumlahAyat) * 100) : 0;
+
   return (
-    <div
+    <article
       onClick={handleCardClick}
-      className="group relative bg-white rounded-2xl border border-stone-200/90 hover:border-emerald-700/40 p-4 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 active:scale-[0.99] flex flex-col justify-between cursor-pointer"
+      className="group relative surface-card rounded-2xl border border-theme hover:border-[var(--brand-brass)] p-4 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between cursor-pointer"
     >
-      {/* Top row: Number badge & Arabic Name */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-3">
-          {/* Circular badge */}
-          <div className="w-10 h-10 rounded-xl bg-stone-100 text-stone-700 group-hover:bg-emerald-800 group-hover:text-stone-100 flex items-center justify-center font-bold text-sm transition-colors duration-200 border border-stone-200/60 shrink-0">
-            {surat.nomor}
+      {/* Top Row: Geometric Surah Number + Name + Arabic Calligraphy */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Traditional diamond/octagon Mushaf badge */}
+          <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+            <span
+              className="absolute inset-1 rotate-45 rounded-[6px] surface-elevated border border-theme group-hover:bg-[#1B4332] group-hover:border-[#1B4332] transition-colors"
+              aria-hidden="true"
+            />
+            <span className="relative z-10 text-xs font-semibold ink-primary group-hover:text-white transition-colors tabular-nums">
+              {surat.nomor}
+            </span>
           </div>
-          <div>
+
+          <div className="min-w-0">
             <Link
               href={`/surat/${surat.nomor}`}
-              className="font-bold text-stone-900 group-hover:text-emerald-850 text-base transition-colors line-clamp-1 before:absolute before:inset-0 before:z-0"
+              className="font-semibold ink-primary group-hover:text-emerald-700 text-[15px] transition-colors line-clamp-1 before:absolute before:inset-0 before:z-0"
             >
               {surat.namaLatin}
             </Link>
-            <p className="text-xs text-stone-500 line-clamp-1">{surat.arti}</p>
+            <p className="text-xs ink-muted line-clamp-1 mt-0.5">{surat.arti}</p>
           </div>
         </div>
 
-        {/* Calligraphy in Arabic */}
-        <div className="text-right">
-          <span className="font-arabic text-2xl text-emerald-950 font-bold group-hover:text-emerald-800 transition-colors">
+        <div className="text-right shrink-0">
+          <span className="font-arabic text-2xl ink-arabic group-hover:text-emerald-800 transition-colors leading-none block">
             {surat.nama}
           </span>
         </div>
       </div>
 
-      {/* Info Pills & Quick Actions */}
-      <div className="flex items-center justify-between pt-2 border-t border-stone-100 text-xs text-stone-500">
-        <div className="flex items-center gap-2">
-          <span
-            className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${
-              isMekah
-                ? "bg-stone-100 text-stone-700 border-stone-200"
-                : "bg-emerald-50/70 text-emerald-800 border-emerald-200/50"
-            }`}
-          >
-            {surat.tempatTurun}
-          </span>
-          <span className="text-stone-400">•</span>
+      {/* Optional Memorize Progress Line */}
+      {hasProgress && (
+        <div className="mb-2.5 space-y-1">
+          <div className="w-full h-1 rounded-full surface-elevated overflow-hidden flex">
+            <div
+              className="h-full bg-[#2D6A4F]"
+              style={{ width: `${(mutqin / surat.jumlahAyat) * 100}%` }}
+            />
+            <div
+              className="h-full bg-[#C8A978]"
+              style={{ width: `${(proses / surat.jumlahAyat) * 100}%` }}
+            />
+          </div>
+          <p className="text-[10px] ink-muted">
+            Hafalan: <span className="font-medium ink-primary">{mutqin} mutqin</span>
+            {proses > 0 ? `, ${proses} proses` : ""} ({mutqinPct}%)
+          </p>
+        </div>
+      )}
+
+      {/* Bottom Meta & Restrained Quick Actions */}
+      <div className="flex items-center justify-between pt-2.5 border-t border-theme text-[11px] ink-muted">
+        <div className="flex items-center gap-1.5">
+          <span>{surat.tempatTurun}</span>
+          <span>•</span>
           <span>{surat.jumlahAyat} Ayat</span>
         </div>
 
-        {/* 4 Quick Mode Action Links - Isolated with z-10 */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative z-10 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity"
+          className="relative z-10 flex items-center gap-1"
         >
-          <Link
-            href={`/surat/${surat.nomor}?mode=read`}
-            onClick={(e) => e.stopPropagation()}
-            title="Baca Surat"
-            className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 hover:text-emerald-800 transition-colors"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-          </Link>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               if (onQuickAction) onQuickAction("listen");
             }}
-            title="Dengarkan Murattal"
-            className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 hover:text-emerald-800 transition-colors"
+            title={`Dengarkan Murattal ${surat.namaLatin}`}
+            aria-label={`Dengarkan Murattal ${surat.namaLatin}`}
+            className="p-1.5 rounded-lg ink-muted hover:ink-primary hover:bg-black/5 transition-colors cursor-pointer"
           >
             <Headphones className="w-3.5 h-3.5" />
           </button>
           <Link
             href={`/surat/${surat.nomor}?mode=memorize`}
             onClick={(e) => e.stopPropagation()}
-            title="Mode Hafalan"
-            className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 hover:text-emerald-800 transition-colors"
+            title={`Muraja'ah Hafalan ${surat.namaLatin}`}
+            aria-label={`Muraja'ah Hafalan ${surat.namaLatin}`}
+            className="p-1.5 rounded-lg ink-muted hover:ink-primary hover:bg-black/5 transition-colors"
           >
-            <Brain className="w-3.5 h-3.5" />
-          </Link>
-          <Link
-            href={`/surat/${surat.nomor}?mode=reflect`}
-            onClick={(e) => e.stopPropagation()}
-            title="AI Tadabbur / Refleksi"
-            className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 hover:text-emerald-800 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
+            <BookmarkCheck className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
